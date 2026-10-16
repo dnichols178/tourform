@@ -194,7 +194,7 @@ declare(strict_types=1);
                             <span class="zoom-level-badge" id="zoomLevelBadge">100%</span>
                         </div>
 
-                        <canvas id="routeCanvas" width="900" height="580"></canvas>
+                        <canvas id="routeCanvas" width="900" height="680"></canvas>
                         <div id="mapTooltip" class="map-tooltip" style="display: none;"></div>
                         <div id="gisStatusMessage" class="gis-status-banner" style="display: none;"></div>
                     </div>
