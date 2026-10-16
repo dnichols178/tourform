@@ -181,7 +181,7 @@ foreach ($rawStops as $s) {
     }
 
     $stops[] = [
-        'display_num' => '#' . $stopCounter++,
+        'display_num' => $stopCounter++,
         'name'        => $name,
         'minutes'     => $minutes,
         'window'      => $scheduleWindow,
@@ -218,7 +218,6 @@ $hasRouteMap = is_string($routeImageData) && str_starts_with($routeImageData, 'd
                 <img src="assets/doe_logo.png" alt="U.S. Department of Energy" class="cover-logo">
             </div>
             <div class="cover-typography">
-                <span class="cover-pretitle">FACILITY TOUR BRIEFING & REPORT</span>
                 <h1 class="cover-title"><?= $tourTitle ?></h1>
                 <div class="cover-rule"></div>
                 <div class="cover-date"><?= $formattedDate ?></div>
@@ -247,13 +246,13 @@ $hasRouteMap = is_string($routeImageData) && str_starts_with($routeImageData, 'd
                 <span class="badge">OFFICIAL TOUR AGENDA & BRIEFING</span>
                 <span class="report-date"><?= $formattedDate ?></span>
             </div>
-            <h2 class="report-title-page2"><?= $tourTitle ?></h2>
+            <h2 class="report-title-page2"><?= $tourTitle ?> Tour</h2>
             <div class="report-details-grid">
                 <div>
-                    <strong>Date & Time Window:</strong> <?= $formattedDate ?> &bull; <?= $formattedTime ?>
+                    <strong>Date & Time Window:</strong> <br/> <?= $formattedDate ?> <?= $formattedTime ?>
                 </div>
                 <div>
-                    <strong>Lead Coordinator:</strong> <?= $coordinatorName ?> &bull; <?= $coordinatorPhone ?> &bull; <?= $coordinatorEmail ?>
+                    <strong>Lead Coordinator:</strong> <?= $coordinatorName ?> <br/> <?= $coordinatorPhone ?> &bull; <?= $coordinatorEmail ?>
                 </div>
             </div>
         </header>
@@ -314,7 +313,6 @@ $hasRouteMap = is_string($routeImageData) && str_starts_with($routeImageData, 'd
                 <table class="report-table">
                     <thead>
                         <tr>
-                            <th style="width: 8%;">Stop</th>
                             <th style="width: 22%;">Schedule Window</th>
                             <th style="width: 26%;">Facility / Location</th>
                             <th style="width: 22%;">Subject Matter Expert (SME)</th>
@@ -324,7 +322,6 @@ $hasRouteMap = is_string($routeImageData) && str_starts_with($routeImageData, 'd
                     <tbody>
                         <?php foreach ($stops as $stop): ?>
                             <tr>
-                                <td class="text-center font-bold"><?= $stop['display_num'] ?></td>
                                 <td><?= $stop['window'] ?></td>
                                 <td><strong><?= $stop['name'] ?></strong></td>
                                 <td><?= $stop['sme'] ?: '<em>None designated</em>' ?></td>
@@ -355,23 +352,6 @@ $hasRouteMap = is_string($routeImageData) && str_starts_with($routeImageData, 'd
                 </div>
             </section>
         <?php endif; ?>
-
-        <!-- Document Signoff Footer -->
-        <footer class="report-footer-compact">
-            <div class="signature-line-compact">
-                <div>
-                    <span class="sig-title">Coordinator Sign-off:</span>
-                    <span class="sig-underline"></span>
-                </div>
-                <div>
-                    <span class="sig-title">Date Signed:</span>
-                    <span class="sig-underline"></span>
-                </div>
-            </div>
-            <div class="generated-stamp">
-                Record ID: <code><?= clean($tourId) ?></code> &bull; Page 2 of 2
-            </div>
-        </footer>
     </div>
 </body>
 </html>
