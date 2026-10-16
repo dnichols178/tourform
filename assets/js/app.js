@@ -79,20 +79,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const leadersList = document.getElementById('leadersList');
     const addLeaderBtn = document.getElementById('addLeaderBtn');
 
-    addLeaderBtn.addEventListener('click', () => {
-        const div = document.createElement('div');
-        div.className = 'dynamic-row-personnel';
-        div.innerHTML = `
-            <div class="person-name-field">
-                <input type="text" name="leader_names[]" placeholder="Leader Full Name & Title" required>
-            </div>
-            <div class="person-org-field">
-                <input type="text" name="leader_orgs[]" placeholder="Organization (e.g., DOE / FRNP)" required>
-            </div>
-            <button type="button" class="btn btn-icon btn-remove" title="Remove Leader">&times;</button>
-        `;
-        leadersList.appendChild(div);
-    });
+    if (addLeaderBtn && leadersList) {
+        addLeaderBtn.addEventListener('click', () => {
+            const div = document.createElement('div');
+            div.className = 'dynamic-row-personnel';
+            div.innerHTML = `
+                <div class="person-name-field">
+                    <input type="text" name="leader_names[]" placeholder="Leader Full Name & Title" required>
+                </div>
+                <div class="person-org-field">
+                    <input type="text" name="leader_orgs[]" placeholder="Organization (e.g., DOE / FRNP)" required>
+                </div>
+                <button type="button" class="btn btn-icon btn-remove" title="Remove Leader">&times;</button>
+            `;
+            leadersList.appendChild(div);
+        });
+    }
 
     // -------------------------------------------------------------
     // Participants & Same Organization Toggle
@@ -104,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const commonOrgInput = document.getElementById('commonOrgInput');
 
     function syncParticipantOrgs() {
-        if (!sameOrgToggle.checked) return;
+        if (!sameOrgToggle || !sameOrgToggle.checked) return;
         const orgVal = commonOrgInput.value;
         const orgInputs = participantsList.querySelectorAll('.participant-org-input');
         orgInputs.forEach(input => {
@@ -113,43 +115,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    sameOrgToggle.addEventListener('change', () => {
-        const isSame = sameOrgToggle.checked;
-        commonOrgContainer.style.display = isSame ? 'block' : 'none';
-        const orgInputs = participantsList.querySelectorAll('.participant-org-input');
+    if (sameOrgToggle && commonOrgContainer && commonOrgInput && participantsList) {
+        sameOrgToggle.addEventListener('change', () => {
+            const isSame = sameOrgToggle.checked;
+            commonOrgContainer.style.display = isSame ? 'block' : 'none';
+            const orgInputs = participantsList.querySelectorAll('.participant-org-input');
 
-        if (isSame) {
-            if (!commonOrgInput.value.trim() && orgInputs.length > 0 && orgInputs[0].value.trim()) {
-                commonOrgInput.value = orgInputs[0].value.trim();
+            if (isSame) {
+                if (!commonOrgInput.value.trim() && orgInputs.length > 0 && orgInputs[0].value.trim()) {
+                    commonOrgInput.value = orgInputs[0].value.trim();
+                }
+                syncParticipantOrgs();
+                commonOrgInput.focus();
+            } else {
+                orgInputs.forEach(input => {
+                    input.disabled = false;
+                });
             }
-            syncParticipantOrgs();
-            commonOrgInput.focus();
-        } else {
-            orgInputs.forEach(input => {
-                input.disabled = false;
-            });
-        }
-    });
+        });
 
-    commonOrgInput.addEventListener('input', syncParticipantOrgs);
+        commonOrgInput.addEventListener('input', syncParticipantOrgs);
+    }
 
-    addParticipantBtn.addEventListener('click', () => {
-        const div = document.createElement('div');
-        div.className = 'dynamic-row-personnel';
-        const orgValue = sameOrgToggle.checked ? commonOrgInput.value : '';
-        const orgDisabled = sameOrgToggle.checked ? 'disabled' : '';
+    if (addParticipantBtn && participantsList) {
+        addParticipantBtn.addEventListener('click', () => {
+            const div = document.createElement('div');
+            div.className = 'dynamic-row-personnel';
+            const isSame = sameOrgToggle && sameOrgToggle.checked;
+            const orgValue = isSame ? commonOrgInput.value : '';
+            const orgDisabled = isSame ? 'disabled' : '';
 
-        div.innerHTML = `
-            <div class="person-name-field">
-                <input type="text" name="participant_names[]" placeholder="Participant Full Name" required>
-            </div>
-            <div class="person-org-field">
-                <input type="text" name="participant_orgs[]" class="participant-org-input" value="${orgValue}" ${orgDisabled} placeholder="Organization / Agency" required>
-            </div>
-            <button type="button" class="btn btn-icon btn-remove" title="Remove Participant">&times;</button>
-        `;
-        participantsList.appendChild(div);
-    });
+            div.innerHTML = `
+                <div class="person-name-field">
+                    <input type="text" name="participant_names[]" placeholder="Participant Full Name" required>
+                </div>
+                <div class="person-org-field">
+                    <input type="text" name="participant_orgs[]" class="participant-org-input" value="${orgValue}" ${orgDisabled} placeholder="Organization / Agency" required>
+                </div>
+                <button type="button" class="btn btn-icon btn-remove" title="Remove Participant">&times;</button>
+            `;
+            participantsList.appendChild(div);
+        });
+    }
 
     // Delegate row removal for leaders & participants
     document.addEventListener('click', (e) => {
@@ -162,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -------------------------------------------------------------
-    // Collapsible & Reorderable Stops Engine (Collapsed by default, blank values)
+    // Collapsible & Reorderable Stops Engine
     // -------------------------------------------------------------
     const stopsList = document.getElementById('stopsList');
     const addStopBtn = document.getElementById('addStopBtn');
@@ -179,14 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const alertTotalMins = document.getElementById('alertTotalMins');
     const alertOverMins = document.getElementById('alertOverMins');
 
-    // Create a new Stop Card (Collapsed by default, blank inputs)
+    // Create a new Stop Card (Collapsed by default)
     function addFacilityStop(prefillName = '') {
+        if (!stopsList) return null;
         const currentCount = stopsList.querySelectorAll('.dynamic-stop').length + 1;
         const displayName = prefillName || 'New Stop';
 
         const stopDiv = document.createElement('div');
         stopDiv.className = 'stop-card dynamic-stop';
-        stopDiv.setAttribute('data-expanded', 'false'); // Collapsed by default
+        stopDiv.setAttribute('data-expanded', 'false');
         stopDiv.innerHTML = `
             <div class="stop-header">
                 <div class="stop-header-left">
@@ -229,93 +237,101 @@ document.addEventListener('DOMContentLoaded', () => {
         return stopDiv;
     }
 
-    addStopBtn.addEventListener('click', () => addFacilityStop(''));
+    if (addStopBtn) {
+        addStopBtn.addEventListener('click', () => addFacilityStop(''));
+    }
 
-    // Collapse All / Expand All Handlers
-    collapseAllBtn.addEventListener('click', () => {
-        document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'false'));
-    });
+    if (collapseAllBtn) {
+        collapseAllBtn.addEventListener('click', () => {
+            document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'false'));
+        });
+    }
 
-    expandAllBtn.addEventListener('click', () => {
-        document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'true'));
-    });
+    if (expandAllBtn) {
+        expandAllBtn.addEventListener('click', () => {
+            document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'true'));
+        });
+    }
 
     // Delegation on Stops List: Collapse, Reorder Up/Down, Remove
-    stopsList.addEventListener('click', (e) => {
-        const stopCard = e.target.closest('.dynamic-stop');
-        if (!stopCard) return;
+    if (stopsList) {
+        stopsList.addEventListener('click', (e) => {
+            const stopCard = e.target.closest('.dynamic-stop');
+            if (!stopCard) return;
 
-        // Toggle Collapse on Header Click
-        if (e.target.closest('.stop-header') && !e.target.closest('.btn-reorder') && !e.target.closest('.btn-remove-stop')) {
-            const isExpanded = stopCard.getAttribute('data-expanded') === 'true';
-            stopCard.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
-            return;
-        }
+            // Toggle Collapse on Header Click
+            if (e.target.closest('.stop-header') && !e.target.closest('.btn-reorder') && !e.target.closest('.btn-remove-stop')) {
+                const isExpanded = stopCard.getAttribute('data-expanded') === 'true';
+                stopCard.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
+                return;
+            }
 
-        // Reorder Up
-        if (e.target.closest('.btn-move-up')) {
-            e.stopPropagation();
-            const prev = stopCard.previousElementSibling;
-            if (prev && prev.classList.contains('dynamic-stop')) {
-                stopsList.insertBefore(stopCard, prev);
+            // Reorder Up
+            if (e.target.closest('.btn-move-up')) {
+                e.stopPropagation();
+                const prev = stopCard.previousElementSibling;
+                if (prev && prev.classList.contains('dynamic-stop')) {
+                    stopsList.insertBefore(stopCard, prev);
+                    renumberStops();
+                    recalculateTimeBudget();
+                }
+                return;
+            }
+
+            // Reorder Down
+            if (e.target.closest('.btn-move-down')) {
+                e.stopPropagation();
+                const next = stopCard.nextElementSibling;
+                if (next && next.classList.contains('dynamic-stop')) {
+                    stopsList.insertBefore(next, stopCard);
+                    renumberStops();
+                    recalculateTimeBudget();
+                }
+                return;
+            }
+
+            // Remove Stop
+            if (e.target.closest('.btn-remove-stop')) {
+                e.stopPropagation();
+                const allCards = Array.from(stopsList.querySelectorAll('.dynamic-stop'));
+                const cardIndex = allCards.indexOf(stopCard);
+                if (cardIndex > -1 && cardIndex < stopsMarkers.length) {
+                    stopsMarkers.splice(cardIndex, 1);
+                }
+
+                stopCard.remove();
                 renumberStops();
                 recalculateTimeBudget();
+                render(false);
             }
-            return;
-        }
+        });
 
-        // Reorder Down
-        if (e.target.closest('.btn-move-down')) {
-            e.stopPropagation();
-            const next = stopCard.nextElementSibling;
-            if (next && next.classList.contains('dynamic-stop')) {
-                stopsList.insertBefore(next, stopCard);
-                renumberStops();
+        // Sync Live Header Summary as user types
+        stopsList.addEventListener('input', (e) => {
+            const stopCard = e.target.closest('.dynamic-stop');
+            if (!stopCard) return;
+
+            if (e.target.classList.contains('facility-name-input')) {
+                const preview = stopCard.querySelector('.stop-header-preview');
+                if (preview) {
+                    preview.textContent = e.target.value.trim() || 'New Stop';
+                }
+            }
+
+            if (e.target.classList.contains('facility-minutes-input')) {
+                const timePill = stopCard.querySelector('.stop-header-time-pill');
+                if (timePill) {
+                    const val = e.target.value.trim();
+                    timePill.textContent = val !== '' ? `${val} min` : '-- min';
+                }
                 recalculateTimeBudget();
             }
-            return;
-        }
-
-        // Remove Stop
-        if (e.target.closest('.btn-remove-stop')) {
-            e.stopPropagation();
-            const allCards = Array.from(stopsList.querySelectorAll('.dynamic-stop'));
-            const cardIndex = allCards.indexOf(stopCard);
-            if (cardIndex > -1 && cardIndex < stopsMarkers.length) {
-                stopsMarkers.splice(cardIndex, 1);
-            }
-
-            stopCard.remove();
-            renumberStops();
-            recalculateTimeBudget();
-            render(false);
-        }
-    });
-
-    // Sync Live Header Summary as user types
-    stopsList.addEventListener('input', (e) => {
-        const stopCard = e.target.closest('.dynamic-stop');
-        if (!stopCard) return;
-
-        if (e.target.classList.contains('facility-name-input')) {
-            const preview = stopCard.querySelector('.stop-header-preview');
-            if (preview) {
-                preview.textContent = e.target.value.trim() || 'New Stop';
-            }
-        }
-
-        if (e.target.classList.contains('facility-minutes-input')) {
-            const timePill = stopCard.querySelector('.stop-header-time-pill');
-            if (timePill) {
-                const val = e.target.value.trim();
-                timePill.textContent = val !== '' ? `${val} min` : '-- min';
-            }
-            recalculateTimeBudget();
-        }
-    });
+        });
+    }
 
     // Renumber Stops Chronologically
     function renumberStops() {
+        if (!stopsList) return;
         const stopCards = stopsList.querySelectorAll('.dynamic-stop');
         stopCards.forEach((card, index) => {
             const label = card.querySelector('.stop-number');
@@ -335,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Live Tour Time Budget Tracker
     // -------------------------------------------------------------
     function calculateTotalTourMinutes() {
+        if (!timeStartInput || !timeEndInput) return null;
         const start = timeStartInput.value;
         const end = timeEndInput.value;
         if (!start || !end) return null;
@@ -353,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function recalculateTimeBudget() {
+        if (!statAllocated || !statTotalTour) return;
         const totalTourMins = calculateTotalTourMinutes();
         const minuteInputs = Array.from(document.querySelectorAll('.facility-minutes-input'));
 
@@ -368,9 +386,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (totalTourMins === null) {
             statTotalTour.textContent = '-- mins (set times)';
-            statRemaining.textContent = '-- mins';
-            statRemaining.className = 'budget-val';
-            timeAlertBox.style.display = 'none';
+            if (statRemaining) {
+                statRemaining.textContent = '-- mins';
+                statRemaining.className = 'budget-val';
+            }
+            if (timeAlertBox) timeAlertBox.style.display = 'none';
             minuteInputs.forEach(inp => inp.classList.remove('input-danger'));
             return;
         }
@@ -380,30 +400,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (remaining < 0) {
             const overMins = Math.abs(remaining);
-            statRemaining.textContent = `Exceeded by ${overMins} mins`;
-            statRemaining.className = 'budget-val exceeded';
+            if (statRemaining) {
+                statRemaining.textContent = `Exceeded by ${overMins} mins`;
+                statRemaining.className = 'budget-val exceeded';
+            }
 
-            alertAllocatedMins.textContent = String(totalAllocated);
-            alertTotalMins.textContent = String(totalTourMins);
-            alertOverMins.textContent = String(overMins);
-            timeAlertBox.style.display = 'block';
+            if (alertAllocatedMins) alertAllocatedMins.textContent = String(totalAllocated);
+            if (alertTotalMins) alertTotalMins.textContent = String(totalTourMins);
+            if (alertOverMins) alertOverMins.textContent = String(overMins);
+            if (timeAlertBox) timeAlertBox.style.display = 'block';
             minuteInputs.forEach(inp => inp.classList.add('input-danger'));
         } else {
-            statRemaining.textContent = `${remaining} mins`;
-            statRemaining.className = 'budget-val ok';
-            timeAlertBox.style.display = 'none';
+            if (statRemaining) {
+                statRemaining.textContent = `${remaining} mins`;
+                statRemaining.className = 'budget-val ok';
+            }
+            if (timeAlertBox) timeAlertBox.style.display = 'none';
             minuteInputs.forEach(inp => inp.classList.remove('input-danger'));
         }
     }
 
-    timeStartInput.addEventListener('change', recalculateTimeBudget);
-    timeEndInput.addEventListener('change', recalculateTimeBudget);
+    if (timeStartInput) timeStartInput.addEventListener('change', recalculateTimeBudget);
+    if (timeEndInput) timeEndInput.addEventListener('change', recalculateTimeBudget);
 
     // -------------------------------------------------------------
-    // GIS Layers (Roads & Footprints), Pan/Zoom & Vector Canvas Engine
+    // GIS Layers, Pan/Zoom & Vector Canvas Engine
     // -------------------------------------------------------------
     const canvas = document.getElementById('routeCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas ? canvas.getContext('2d') : null;
     const mapTooltip = document.getElementById('mapTooltip');
     const gisStatusMessage = document.getElementById('gisStatusMessage');
     const canvasModeLabel = document.getElementById('canvasModeLabel');
@@ -466,31 +490,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mode Selector Handler
     function setMode(mode) {
         currentMode = mode;
-        panToolBtn.classList.toggle('active', mode === 'pan');
-        stopToolBtn.classList.toggle('active', mode === 'stop');
-        routeToolBtn.classList.toggle('active', mode === 'route');
+        if (panToolBtn) panToolBtn.classList.toggle('active', mode === 'pan');
+        if (stopToolBtn) stopToolBtn.classList.toggle('active', mode === 'stop');
+        if (routeToolBtn) routeToolBtn.classList.toggle('active', mode === 'route');
 
         if (mode === 'pan') {
-            canvasModeLabel.textContent = 'Mode: Pan Map';
-            canvasModeHelp.innerHTML = '<strong>Pan Tool:</strong> Drag to move map. Scroll wheel to zoom in/out.';
-            canvas.style.cursor = 'grab';
+            if (canvasModeLabel) canvasModeLabel.textContent = 'Mode: Pan Map';
+            if (canvasModeHelp) canvasModeHelp.innerHTML = '<strong>Pan Tool:</strong> Drag to move map. Scroll wheel to zoom in/out.';
+            if (canvas) canvas.style.cursor = 'grab';
         } else if (mode === 'stop') {
-            canvasModeLabel.textContent = 'Mode: Place Stop';
-            canvasModeHelp.innerHTML = '<strong>Stop Tool:</strong> Click any building or location to place a stop and add to itinerary.';
-            canvas.style.cursor = 'pointer';
+            if (canvasModeLabel) canvasModeLabel.textContent = 'Mode: Place Stop';
+            if (canvasModeHelp) canvasModeHelp.innerHTML = '<strong>Stop Tool:</strong> Click any building or location to place a stop and add to itinerary.';
+            if (canvas) canvas.style.cursor = 'pointer';
         } else if (mode === 'route') {
-            canvasModeLabel.textContent = 'Mode: Draw Route';
-            canvasModeHelp.innerHTML = '<strong>Route Tool:</strong> Click to draw route waypoints with arrows. Double-click to complete leg.';
-            canvas.style.cursor = 'crosshair';
+            if (canvasModeLabel) canvasModeLabel.textContent = 'Mode: Draw Route';
+            if (canvasModeHelp) canvasModeHelp.innerHTML = '<strong>Route Tool:</strong> Click to draw route waypoints with arrows. Double-click to complete leg.';
+            if (canvas) canvas.style.cursor = 'crosshair';
         }
 
-        mapTooltip.style.display = 'none';
+        if (mapTooltip) mapTooltip.style.display = 'none';
         render(false);
     }
 
-    panToolBtn.addEventListener('click', () => setMode('pan'));
-    stopToolBtn.addEventListener('click', () => setMode('stop'));
-    routeToolBtn.addEventListener('click', () => setMode('route'));
+    if (panToolBtn) panToolBtn.addEventListener('click', () => setMode('pan'));
+    if (stopToolBtn) stopToolBtn.addEventListener('click', () => setMode('stop'));
+    if (routeToolBtn) routeToolBtn.addEventListener('click', () => setMode('route'));
 
     // Fetch Facilities and Roads in parallel
     Promise.all([
@@ -500,12 +524,19 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(([facData, roadData]) => {
         gisData = facData;
         roadsData = roadData;
-        gisStatusMessage.style.display = 'none';
+        if (gisStatusMessage) gisStatusMessage.style.display = 'none';
 
         if (gisData && gisData.bounds) {
             computeTransforms();
         }
-        render(false);
+
+        // Re-apply saved state if loaded during tour editing
+        const mapStateInput = document.getElementById('map_state');
+        if (mapStateInput && mapStateInput.value && typeof window.restoreMapEngineState === 'function') {
+            window.restoreMapEngineState(mapStateInput.value);
+        } else {
+            render(false);
+        }
     })
     .catch(err => {
         console.error('GIS layer loading error:', err);
@@ -514,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Compute Base Transform (Local Survey Feet -> Base Canvas 900x580 Space)
     function computeTransforms() {
-        if (!gisData || !gisData.bounds) return;
+        if (!gisData || !gisData.bounds || !canvas) return;
 
         const bounds = gisData.bounds;
         const padding = 28;
@@ -566,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getFeatureAtPosition(worldX, worldY) {
-        if (!gisData || !showFootprints.checked) return null;
+        if (!gisData || !showFootprints || !showFootprints.checked) return null;
         for (let i = gisData.features.length - 1; i >= 0; i--) {
             const feat = gisData.features[i];
             if (!feat.canvasRings) continue;
@@ -581,6 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw background grid in base coordinates
     function drawGrid() {
+        if (!ctx || !canvas) return;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -604,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw Public Roadway Network
     function drawRoads() {
-        if (!roadsData || !showRoads.checked || !roadsData.roads) return;
+        if (!ctx || !roadsData || !showRoads || !showRoads.checked || !roadsData.roads) return;
 
         ctx.save();
         ctx.lineCap = 'round';
@@ -630,9 +662,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw GIS Footprints & Labels
     function drawFootprints() {
-        if (!gisData || !showFootprints.checked) return;
+        if (!ctx || !gisData || !showFootprints || !showFootprints.checked) return;
 
-        const renderLabels = showLabels.checked;
+        const renderLabels = showLabels && showLabels.checked;
 
         gisData.features.forEach(feat => {
             if (!feat.canvasRings) return;
@@ -675,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw Green Circle Stops
     function drawStops() {
-        if (stopsMarkers.length === 0) return;
+        if (!ctx || stopsMarkers.length === 0) return;
 
         ctx.save();
         stopsMarkers.forEach((stop) => {
@@ -699,6 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw single directional arrowhead
     function drawArrowHead(x, y, angle, color, size) {
+        if (!ctx) return;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angle);
@@ -742,6 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Main Redraw Loop with Viewport Transformation
     function render(includeHoverGuide = true) {
+        if (!ctx || !canvas) return;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -765,9 +799,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Green Stop Markers
         drawStops();
 
-        const selectedColor = strokeColor.value;
-        const selectedWidth = parseInt(lineWidth.value, 10) / viewport.zoom;
-        const renderArrows = showArrows.checked;
+        const selectedColor = strokeColor ? strokeColor.value : '#d9381e';
+        const selectedWidth = (lineWidth ? parseInt(lineWidth.value, 10) : 4) / viewport.zoom;
+        const renderArrows = showArrows ? showArrows.checked : true;
 
         // 5. Committed Route Legs
         legs.forEach((leg) => {
@@ -831,6 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Coordinate Conversion
     function getCanvasCoordinates(e) {
+        if (!canvas) return { canvasX: 0, canvasY: 0, worldX: 0, worldY: 0, domX: 0, domY: 0 };
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
@@ -873,7 +908,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateZoomUI() {
-        zoomLevelBadge.textContent = `${Math.round(viewport.zoom * 100)}%`;
+        if (zoomLevelBadge) {
+            zoomLevelBadge.textContent = `${Math.round(viewport.zoom * 100)}%`;
+        }
     }
 
     function resetView() {
@@ -884,90 +921,93 @@ document.addEventListener('DOMContentLoaded', () => {
         render(true);
     }
 
-    zoomInBtn.addEventListener('click', () => zoomAtPoint(canvas.width / 2, canvas.height / 2, 1.25));
-    zoomOutBtn.addEventListener('click', () => zoomAtPoint(canvas.width / 2, canvas.height / 2, 1 / 1.25));
-    zoomResetBtn.addEventListener('click', resetView);
+    if (zoomInBtn && canvas) zoomInBtn.addEventListener('click', () => zoomAtPoint(canvas.width / 2, canvas.height / 2, 1.25));
+    if (zoomOutBtn && canvas) zoomOutBtn.addEventListener('click', () => zoomAtPoint(canvas.width / 2, canvas.height / 2, 1 / 1.25));
+    if (zoomResetBtn) zoomResetBtn.addEventListener('click', resetView);
 
     // Mouse Wheel Zooming
-    canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const coords = getCanvasCoordinates(e);
-        const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
-        zoomAtPoint(coords.canvasX, coords.canvasY, factor);
-    }, { passive: false });
-
-    // Canvas MouseDown
-    canvas.addEventListener('mousedown', (e) => {
-        if (currentMode === 'pan' || e.spaceKey || e.button === 1 || e.button === 2) {
-            isDragging = true;
-            dragStartX = e.clientX - viewport.panX;
-            dragStartY = e.clientY - viewport.panY;
-            canvas.style.cursor = 'grabbing';
-            return;
-        }
-
-        if (e.button === 0) {
+    if (canvas) {
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
             const coords = getCanvasCoordinates(e);
-            const feat = getFeatureAtPosition(coords.worldX, coords.worldY);
+            const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+            zoomAtPoint(coords.canvasX, coords.canvasY, factor);
+        }, { passive: false });
 
-            // MODE 1: PLACE GREEN CIRCLE STOP
-            if (currentMode === 'stop') {
-                let stopPos = { x: coords.worldX, y: coords.worldY };
-                let formattedLabel = `Stop ${stopsMarkers.length + 1}`;
-
-                if (feat && feat.canvasCenter) {
-                    stopPos = {
-                        x: Math.round(feat.canvasCenter[0] * 10) / 10,
-                        y: Math.round(feat.canvasCenter[1] * 10) / 10
-                    };
-                    formattedLabel = formatFacilityName(feat.id, feat.desc);
-                }
-
-                stopsMarkers.push({
-                    x: stopPos.x,
-                    y: stopPos.y,
-                    name: formattedLabel
-                });
-
-                const nameInputs = Array.from(document.querySelectorAll('.facility-name-input'));
-                const emptyInput = nameInputs.find(inp => inp.value.trim() === '');
-                if (emptyInput) {
-                    emptyInput.value = formattedLabel;
-                    const card = emptyInput.closest('.dynamic-stop');
-                    if (card) {
-                        const preview = card.querySelector('.stop-header-preview');
-                        if (preview) preview.textContent = formattedLabel;
-                    }
-                } else {
-                    addFacilityStop(formattedLabel);
-                }
-
-                render(true);
+        // Canvas MouseDown
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentMode === 'pan' || e.spaceKey || e.button === 1 || e.button === 2) {
+                isDragging = true;
+                dragStartX = e.clientX - viewport.panX;
+                dragStartY = e.clientY - viewport.panY;
+                canvas.style.cursor = 'grabbing';
                 return;
             }
 
-            // MODE 2: DRAW ROUTE WAYPOINTS
-            if (currentMode === 'route') {
-                let targetPoint = { x: coords.worldX, y: coords.worldY };
+            if (e.button === 0) {
+                const coords = getCanvasCoordinates(e);
+                const feat = getFeatureAtPosition(coords.worldX, coords.worldY);
 
-                if (feat && feat.canvasCenter) {
-                    targetPoint = {
-                        x: Math.round(feat.canvasCenter[0] * 10) / 10,
-                        y: Math.round(feat.canvasCenter[1] * 10) / 10
-                    };
+                // MODE 1: PLACE GREEN CIRCLE STOP
+                if (currentMode === 'stop') {
+                    let stopPos = { x: coords.worldX, y: coords.worldY };
+                    let formattedLabel = `Stop ${stopsMarkers.length + 1}`;
+
+                    if (feat && feat.canvasCenter) {
+                        stopPos = {
+                            x: Math.round(feat.canvasCenter[0] * 10) / 10,
+                            y: Math.round(feat.canvasCenter[1] * 10) / 10
+                        };
+                        formattedLabel = formatFacilityName(feat.id, feat.desc);
+                    }
+
+                    stopsMarkers.push({
+                        x: stopPos.x,
+                        y: stopPos.y,
+                        name: formattedLabel
+                    });
+
+                    const nameInputs = Array.from(document.querySelectorAll('.facility-name-input'));
+                    const emptyInput = nameInputs.find(inp => inp.value.trim() === '');
+                    if (emptyInput) {
+                        emptyInput.value = formattedLabel;
+                        const card = emptyInput.closest('.dynamic-stop');
+                        if (card) {
+                            const preview = card.querySelector('.stop-header-preview');
+                            if (preview) preview.textContent = formattedLabel;
+                        }
+                    } else {
+                        addFacilityStop(formattedLabel);
+                    }
+
+                    render(true);
+                    return;
                 }
 
-                if (!legs[activeLegIndex]) {
-                    legs[activeLegIndex] = [];
+                // MODE 2: DRAW ROUTE WAYPOINTS
+                if (currentMode === 'route') {
+                    let targetPoint = { x: coords.worldX, y: coords.worldY };
+
+                    if (feat && feat.canvasCenter) {
+                        targetPoint = {
+                            x: Math.round(feat.canvasCenter[0] * 10) / 10,
+                            y: Math.round(feat.canvasCenter[1] * 10) / 10
+                        };
+                    }
+
+                    if (!legs[activeLegIndex]) {
+                        legs[activeLegIndex] = [];
+                    }
+                    legs[activeLegIndex].push(targetPoint);
+                    render(true);
                 }
-                legs[activeLegIndex].push(targetPoint);
-                render(true);
             }
-        }
-    });
+        });
+    }
 
     // Window MouseMove
     window.addEventListener('mousemove', (e) => {
+        if (!canvas) return;
         if (isDragging) {
             viewport.panX = e.clientX - dragStartX;
             viewport.panY = e.clientY - dragStartY;
@@ -980,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hoverPos) {
                 hoverPos = null;
                 hoveredFeature = null;
-                mapTooltip.style.display = 'none';
+                if (mapTooltip) mapTooltip.style.display = 'none';
                 render(false);
             }
             return;
@@ -1000,15 +1040,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (hoveredFeature) {
                 canvas.style.cursor = 'pointer';
-                mapTooltip.style.display = 'block';
-                mapTooltip.style.left = `${coords.domX + 12}px`;
-                mapTooltip.style.top = `${coords.domY + 12}px`;
+                if (mapTooltip) {
+                    mapTooltip.style.display = 'block';
+                    mapTooltip.style.left = `${coords.domX + 12}px`;
+                    mapTooltip.style.top = `${coords.domY + 12}px`;
 
-                const displayTooltip = formatFacilityName(hoveredFeature.id, hoveredFeature.desc);
-                mapTooltip.innerHTML = `<strong>${displayTooltip}</strong>`;
+                    const displayTooltip = formatFacilityName(hoveredFeature.id, hoveredFeature.desc);
+                    mapTooltip.innerHTML = `<strong>${displayTooltip}</strong>`;
+                }
             } else {
                 canvas.style.cursor = currentMode === 'route' ? 'crosshair' : 'pointer';
-                mapTooltip.style.display = 'none';
+                if (mapTooltip) mapTooltip.style.display = 'none';
             }
         }
     });
@@ -1016,18 +1058,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('mouseup', () => {
         if (isDragging) {
             isDragging = false;
-            canvas.style.cursor = currentMode === 'pan' ? 'grab' : (currentMode === 'route' ? 'crosshair' : 'pointer');
+            if (canvas) canvas.style.cursor = currentMode === 'pan' ? 'grab' : (currentMode === 'route' ? 'crosshair' : 'pointer');
             render(true);
         }
     });
 
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    if (canvas) {
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
 
     // Spacebar temporary pan
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
             e.preventDefault();
-            canvas.style.cursor = 'grab';
+            if (canvas) canvas.style.cursor = 'grab';
         }
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             if (!['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
@@ -1039,9 +1083,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('keyup', (e) => {
         if (e.code === 'Space') {
-            canvas.style.cursor = currentMode === 'pan' ? 'grab' : (currentMode === 'route' ? 'crosshair' : 'pointer');
+            if (canvas) canvas.style.cursor = currentMode === 'pan' ? 'grab' : (currentMode === 'route' ? 'crosshair' : 'pointer');
         }
     });
+
+    // -------------------------------------------------------------
+    // Global State Sync: Connect Engine to Form & Database Serializers
+    // -------------------------------------------------------------
+    window.getMapEngineState = function() {
+        return {
+            zoom: viewport.zoom,
+            scale: viewport.zoom,
+            panX: viewport.panX,
+            panY: viewport.panY,
+            offsetX: viewport.panX,
+            offsetY: viewport.panY,
+            zoomPercent: Math.round(viewport.zoom * 100),
+            routeLegs: legs,
+            tourStops: stopsMarkers
+        };
+    };
+
+    window.restoreMapEngineState = function(savedState) {
+        if (!savedState) return;
+        try {
+            const state = typeof savedState === 'string' ? JSON.parse(savedState) : savedState;
+
+            // 1. Restore zoom level
+            const targetZoom = state.zoom || state.scale;
+            if (targetZoom && !isNaN(targetZoom)) {
+                viewport.zoom = parseFloat(targetZoom);
+            }
+
+            // 2. Restore pan offsets
+            if (state.panX !== undefined) {
+                viewport.panX = parseFloat(state.panX);
+            } else if (state.offsetX !== undefined) {
+                viewport.panX = parseFloat(state.offsetX);
+            }
+
+            if (state.panY !== undefined) {
+                viewport.panY = parseFloat(state.panY);
+            } else if (state.offsetY !== undefined) {
+                viewport.panY = parseFloat(state.offsetY);
+            }
+
+            // 3. Restore route legs
+            const restoredLegs = state.routeLegs || state.legs;
+            if (Array.isArray(restoredLegs) && restoredLegs.length > 0) {
+                legs = JSON.parse(JSON.stringify(restoredLegs));
+                activeLegIndex = legs.length - 1;
+            }
+
+            // 4. Restore stop markers
+            const restoredStops = state.tourStops || state.stopsMarkers;
+            if (Array.isArray(restoredStops)) {
+                stopsMarkers = JSON.parse(JSON.stringify(restoredStops));
+            }
+
+            // 5. Update UI badge and repaint
+            updateZoomUI();
+            render(false);
+        } catch (e) {
+            console.error('Failed to restore map engine state:', e);
+        }
+    };
 
     // Start New Route Leg
     function startNewLeg() {
@@ -1052,24 +1158,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    canvas.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        if (currentMode === 'route') {
-            startNewLeg();
-        }
-    });
+    if (canvas) {
+        canvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            if (currentMode === 'route') {
+                startNewLeg();
+            }
+        });
+    }
 
     // Context-Aware Undo Action
     function undoAction() {
         if (currentMode === 'stop' && stopsMarkers.length > 0) {
             stopsMarkers.pop();
-            const stopCards = stopsList.querySelectorAll('.dynamic-stop');
+            const stopCards = stopsList ? stopsList.querySelectorAll('.dynamic-stop') : [];
             if (stopCards.length > 1) {
                 stopCards[stopCards.length - 1].remove();
                 renumberStops();
                 recalculateTimeBudget();
             } else if (stopCards.length === 1) {
-                stopCards[0].querySelector('.facility-name-input').value = '';
+                const nameInput = stopCards[0].querySelector('.facility-name-input');
+                if (nameInput) nameInput.value = '';
                 const preview = stopCards[0].querySelector('.stop-header-preview');
                 if (preview) preview.textContent = 'New Stop';
             }
@@ -1092,93 +1201,111 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Toolbar Event Listeners
-    undoPointBtn.addEventListener('click', undoAction);
-    newLegBtn.addEventListener('click', startNewLeg);
-    strokeColor.addEventListener('input', () => render(true));
-    lineWidth.addEventListener('change', () => render(true));
-    showRoads.addEventListener('change', () => render(true));
-    showFootprints.addEventListener('change', () => render(true));
-    showLabels.addEventListener('change', () => render(true));
-    showArrows.addEventListener('change', () => render(true));
+    if (undoPointBtn) undoPointBtn.addEventListener('click', undoAction);
+    if (newLegBtn) newLegBtn.addEventListener('click', startNewLeg);
+    if (strokeColor) strokeColor.addEventListener('input', () => render(true));
+    if (lineWidth) lineWidth.addEventListener('change', () => render(true));
+    if (showRoads) showRoads.addEventListener('change', () => render(true));
+    if (showFootprints) showFootprints.addEventListener('change', () => render(true));
+    if (showLabels) showLabels.addEventListener('change', () => render(true));
+    if (showArrows) showArrows.addEventListener('change', () => render(true));
 
-    clearCanvasBtn.addEventListener('click', () => {
-        legs = [[]];
-        activeLegIndex = 0;
-        hoverPos = null;
-        render(false);
-    });
+    if (clearCanvasBtn) {
+        clearCanvasBtn.addEventListener('click', () => {
+            legs = [[]];
+            activeLegIndex = 0;
+            hoverPos = null;
+            render(false);
+        });
+    }
 
-    clearStopsBtn.addEventListener('click', () => {
-        stopsMarkers = [];
-        render(false);
-    });
+    if (clearStopsBtn) {
+        clearStopsBtn.addEventListener('click', () => {
+            stopsMarkers = [];
+            render(false);
+        });
+    }
 
-    resetBgBtn.addEventListener('click', () => {
-        bgImage = null;
-        bgImageUpload.value = '';
-        render(true);
-    });
+    if (resetBgBtn && bgImageUpload) {
+        resetBgBtn.addEventListener('click', () => {
+            bgImage = null;
+            bgImageUpload.value = '';
+            render(true);
+        });
+    }
 
     // Base Map Image Upload
-    bgImageUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    if (bgImageUpload) {
+        bgImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                bgImage = img;
-                render(true);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    bgImage = img;
+                    render(true);
+                };
+                img.src = event.target.result;
             };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-
-    // Form Submit Handler
-    tourForm.addEventListener('submit', (e) => {
-        const totalTourMins = calculateTotalTourMinutes();
-        let totalAllocated = 0;
-        document.querySelectorAll('.facility-minutes-input').forEach((inp) => {
-            const val = parseInt(inp.value, 10);
-            if (!isNaN(val)) totalAllocated += val;
+            reader.readAsDataURL(file);
         });
+    }
 
-        if (totalTourMins !== null && totalAllocated > totalTourMins) {
-            const overMins = totalAllocated - totalTourMins;
-            const proceed = confirm(
-                `Warning: Scheduled facility stops total ${totalAllocated} minutes, exceeding the tour window of ${totalTourMins} minutes by ${overMins} minutes.\n\nDo you want to proceed and generate the report anyway?`
-            );
-            if (!proceed) {
-                e.preventDefault();
-                return;
-            }
-        }
-
-        if (sameOrgToggle.checked) {
-            document.querySelectorAll('.participant-org-input').forEach(inp => {
-                inp.disabled = false;
-                inp.value = commonOrgInput.value;
+    // -------------------------------------------------------------
+    // Form Submit Handler
+    // -------------------------------------------------------------
+    if (tourForm) {
+        tourForm.addEventListener('submit', (e) => {
+            const totalTourMins = calculateTotalTourMinutes();
+            let totalAllocated = 0;
+            document.querySelectorAll('.facility-minutes-input').forEach((inp) => {
+                const val = parseInt(inp.value, 10);
+                if (!isNaN(val)) totalAllocated += val;
             });
-        }
 
-        const currentZoom = viewport.zoom;
-        const currentPanX = viewport.panX;
-        const currentPanY = viewport.panY;
+            if (totalTourMins !== null && totalAllocated > totalTourMins) {
+                const overMins = totalAllocated - totalTourMins;
+                const proceed = confirm(
+                    `Warning: Scheduled facility stops total ${totalAllocated} minutes, exceeding the tour window of ${totalTourMins} minutes by ${overMins} minutes.\n\nDo you want to proceed and generate the report anyway?`
+                );
+                if (!proceed) {
+                    e.preventDefault();
+                    return;
+                }
+            }
 
-        viewport.zoom = 1.0;
-        viewport.panX = 0;
-        viewport.panY = 0;
-        hoveredFeature = null;
-        render(false);
+            if (sameOrgToggle && sameOrgToggle.checked) {
+                document.querySelectorAll('.participant-org-input').forEach(inp => {
+                    inp.disabled = false;
+                    inp.value = commonOrgInput.value;
+                });
+            }
 
-        routeImageHidden.value = canvas.toDataURL('image/png');
+            // Render the exact viewport view without hover crosshairs or popups
+            hoveredFeature = null;
+            hoverPos = null;
+            render(false);
 
-        viewport.zoom = currentZoom;
-        viewport.panX = currentPanX;
-        viewport.panY = currentPanY;
-    });
+            // Capture exact current view as PNG at its current zoom and pan coordinates
+            if (routeImageHidden && canvas) {
+                routeImageHidden.value = canvas.toDataURL('image/png');
+            }
+
+            // Serialize current zoom, pan, stops, and legs into map_state
+            const mapStateHidden = document.getElementById('map_state');
+            if (mapStateHidden && typeof window.getMapEngineState === 'function') {
+                mapStateHidden.value = JSON.stringify(window.getMapEngineState());
+            }
+        });
+    }
+
+    // Check if editing an existing record and restore map state immediately
+    const initialMapStateInput = document.getElementById('map_state');
+    if (initialMapStateInput && initialMapStateInput.value && typeof window.restoreMapEngineState === 'function') {
+        window.restoreMapEngineState(initialMapStateInput.value);
+    }
 
     // Default initialization to Pan Mode
     setMode('pan');
