@@ -494,8 +494,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch Facilities and Roads in parallel
     Promise.all([
-        fetch('data/facilities.json').then(r => r.ok ? r.json() : null),
-        fetch('data/roads.json').then(r => r.ok ? r.json() : null)
+        fetch('data/gis/facilities.json').then(r => r.ok ? r.json() : null),
+        fetch('data/gis/roads.json').then(r => r.ok ? r.json() : null)
     ])
     .then(([facData, roadData]) => {
         gisData = facData;
