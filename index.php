@@ -39,7 +39,6 @@ foreach ($files as $file) {
     $stopCount = count($record['stops'] ?? []);
     $totalStopsAllTours += $stopCount;
 
-    // Sum scheduled minutes
     $tourMins = 0;
     foreach (($record['stops'] ?? []) as $st) {
         $tourMins += (int)($st['minutes'] ?? 0);
@@ -63,8 +62,16 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facility Tour Dashboard — Saved Records</title>
+    <title>Facility Tour Dashboard – Saved Records</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .record-card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -72,7 +79,7 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
         <header class="app-header flex-between">
             <div class="header-content">
                 <h1>Facility Tour Dashboard</h1>
-                <p class="subtitle">Review, search, reprint, and manage previously generated tour agendas</p>
+                <p class="subtitle">Review, search, reprint, edit, and manage previously generated tour agendas</p>
             </div>
             <div class="header-nav">
                 <a href="create.php" class="btn btn-primary">+ Create New Tour</a>
@@ -127,7 +134,6 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                             $stopMins = (int)$t['total_stop_mins'];
                             $hasMap = !empty($t['route_image_data']);
 
-                            // Compile facility names for live search matching
                             $facilityNames = [];
                             foreach (($t['stops'] ?? []) as $st) {
                                 if (!empty($st['name'])) $facilityNames[] = $st['name'];
@@ -144,7 +150,6 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                                         <span class="mini-badge-map" title="Includes Vector Route Map">&#128506; Route Map</span>
                                     <?php endif; ?>
                                 </div>
-
                                 <div class="record-meta-list">
                                     <div><strong>Coordinator:</strong> <?= $coord ?></div>
                                     <div><strong>Stops:</strong> <?= $stopCount ?> facilities (<?= $stopMins ?> mins total)</div>
@@ -154,8 +159,8 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                                         </div>
                                     <?php endif; ?>
                                 </div>
-
                                 <div class="record-card-actions">
+                                    <a href="create.php?id=<?= $id ?>" class="btn btn-primary btn-sm">Edit Tour</a>
                                     <a href="generate.php?id=<?= $id ?>" class="btn btn-secondary btn-sm">View & Print Report</a>
                                     <form method="POST" action="index.php" onsubmit="return confirm('Permanently delete this tour record?');">
                                         <input type="hidden" name="action" value="delete">
@@ -172,10 +177,8 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
     </div>
 
     <script>
-        // Instant filter search
         const searchInput = document.getElementById('dashboardSearch');
         const cards = document.querySelectorAll('.tour-record-card');
-
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
