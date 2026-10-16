@@ -1,20 +1,253 @@
 <?php
 declare(strict_types=1);
+
+$dataDir = __DIR__ . '/data';
+if (!is_dir($dataDir)) {
+    @mkdir($dataDir, 0755, true);
+}
+
+function clean(mixed $value): string {
+    return htmlspecialchars(trim((string)($value ?? '')), ENT_QUOTES, 'UTF-8');
+}
+
+$tourId = '';
+$isEdit = false;
+$tourTitle = '';
+$tourDate = '';
+$timeStart = '';
+$timeEnd = '';
+$coordinatorName = '';
+$coordinatorPhone = '';
+$coordinatorEmail = '';
+$generalNotes = '';
+$showArrows = true;
+$leaders = [];
+$participants = [];
+$stops = [];
+$routeImageData = '';
+$mapState = '';
+
+// Check if loading an existing tour for editing via GET ?id=
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
+    $requestedId = basename((string)$_GET['id']);
+    $filePath = $dataDir . '/' . $requestedId . '.json';
+    if (file_exists($filePath)) {
+        $raw = file_get_contents($filePath);
+        if ($raw !== false) {
+            $record = json_decode($raw, true);
+            if (is_array($record)) {
+                $tourId           = $requestedId;
+                $isEdit           = true;
+                $tourTitle        = (string)($record['tour_title'] ?? '');
+                $tourDate         = (string)($record['tour_date'] ?? '');
+                $timeStart        = (string)($record['time_start'] ?? '');
+                $timeEnd          = (string)($record['time_end'] ?? '');
+                $coordinatorName  = (string)($record['coordinator_name'] ?? '');
+                $coordinatorPhone = (string)($record['coordinator_phone'] ?? '');
+                $coordinatorEmail = (string)($record['coordinator_email'] ?? '');
+                $generalNotes     = (string)($record['general_notes'] ?? '');
+                $showArrows       = !empty($record['show_arrows']);
+                $leaders          = is_array($record['leaders'] ?? null) ? $record['leaders'] : [];
+                $participants     = is_array($record['participants'] ?? null) ? $record['participants'] : [];
+                $stops            = is_array($record['stops'] ?? null) ? $record['stops'] : [];
+                $routeImageData   = (string)($record['route_image_data'] ?? '');
+                $mapState         = is_string($record['map_state'] ?? null) ? $record['map_state'] : json_encode($record['map_state'] ?? []);
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facility Tour Agenda & Report Builder</title>
+    <title><?= $isEdit ? 'Edit Tour Agenda: ' . clean($tourTitle) : 'Facility Tour Agenda & Report Builder' ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .canvas-viewport-controls .zoom-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            padding: 0 !important;
+            cursor: pointer !important;
+            box-sizing: border-box !important;
+        }
+        .canvas-viewport-controls .zoom-btn svg {
+            display: block !important;
+            pointer-events: none !important;
+        }
+        .canvas-viewport-controls .zoom-btn.active {
+            background-color: #0066cc !important;
+            border-color: #0052a3 !important;
+            color: #ffffff !important;
+        }
+        .canvas-viewport-controls .zoom-btn.active svg,
+        .canvas-viewport-controls .zoom-btn.active svg * {
+            stroke: #ffffff !important;
+            color: #ffffff !important;
+        }
+        .canvas-viewport-controls .zoom-btn:not(.active) {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+        .canvas-viewport-controls .zoom-btn:not(.active) svg,
+        .canvas-viewport-controls .zoom-btn:not(.active) svg * {
+            stroke: #333333 !important;
+            color: #333333 !important;
+        }
+        .pan-nav-icon {
+            width: 17px !important;
+            height: 17px !important;
+            margin: auto !important;
+        }
+        .badge-edit-mode {
+            display: inline-block;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        /* Highlight state for inputs flagged with missing duration */
+        .input-error-highlight {
+            border-color: #dc2626 !important;
+            background-color: #fef2f2 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+
+        /* Missing Duration Feedback Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            box-sizing: border-box;
+            padding: 16px;
+        }
+        .modal-card {
+            background: #ffffff;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        @keyframes modalScaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-header-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .modal-icon-badge {
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            border-radius: 50%;
+            background: #fef3c7;
+            color: #d97706;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-header-text h3 {
+            margin: 0 0 4px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .modal-header-text p {
+            margin: 0;
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        .modal-body-content {
+            padding: 18px 24px;
+        }
+        .modal-stop-list {
+            list-style: none;
+            margin: 10px 0 0;
+            padding: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .modal-stop-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 13px;
+        }
+        .modal-stop-item:last-child {
+            border-bottom: none;
+        }
+        .modal-stop-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #334155;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+        .modal-stop-needed {
+            color: #dc2626;
+            font-weight: 600;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .modal-footer-actions {
+            padding: 14px 24px 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: #ffffff;
+            border-top: 1px solid #f1f5f9;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
         <header class="app-header flex-between">
             <div class="header-content">
-                <h1>Facility Tour Agenda & Report Builder</h1>
-                <p class="subtitle">Generate print-ready tour itineraries, leader briefings, and route maps</p>
+                <h1>
+                    <?= $isEdit ? 'Edit Tour Agenda & Report' : 'Facility Tour Agenda & Report Builder' ?>
+                    <?php if ($isEdit): ?>
+                        <span class="badge-edit-mode">Editing ID: <?= clean($tourId) ?></span>
+                    <?php endif; ?>
+                </h1>
+                <p class="subtitle"><?= $isEdit ? 'Modify itinerary details, roster, and route map, then save updates' : 'Generate print-ready tour itineraries, leader briefings, and route maps' ?></p>
             </div>
             <div class="header-nav">
                 <a href="index.php" class="btn btn-secondary">View Saved Tours &rarr;</a>
@@ -22,6 +255,10 @@ declare(strict_types=1);
         </header>
 
         <form id="tourForm" action="generate.php" method="POST">
+            <?php if ($isEdit): ?>
+                <input type="hidden" name="tour_id" value="<?= clean($tourId) ?>">
+            <?php endif; ?>
+
             <!-- Section 1: General Information, Logistics & Tour Leaders -->
             <section class="card">
                 <div class="card-header">
@@ -31,36 +268,33 @@ declare(strict_types=1);
                     <div class="grid-2">
                         <div class="form-group span-2">
                             <label for="tour_title">Tour Title / Purpose <span class="required">*</span></label>
-                            <input type="text" id="tour_title" name="tour_title" placeholder="e.g., Annual Regulatory Facility Overview" required>
+                            <input type="text" id="tour_title" name="tour_title" value="<?= clean($tourTitle) ?>" placeholder="e.g., Annual Regulatory Facility Overview" required>
                         </div>
-
-                        <!-- Date, Start Time, and Stop Time side by side on the same line -->
                         <div class="grid-3 span-2">
                             <div class="form-group">
                                 <label for="tour_date">Tour Date <span class="required">*</span></label>
-                                <input type="date" id="tour_date" name="tour_date" required>
+                                <input type="date" id="tour_date" name="tour_date" value="<?= clean($tourDate) ?>" required>
                             </div>
                             <div class="form-group">
                                 <label for="time_start">Start Time <span class="required">*</span></label>
-                                <input type="time" id="time_start" name="time_start" required>
+                                <input type="time" id="time_start" name="time_start" value="<?= clean($timeStart) ?>" required>
                             </div>
                             <div class="form-group">
                                 <label for="time_end">Stop / End Time <span class="required">*</span></label>
-                                <input type="time" id="time_end" name="time_end" required>
+                                <input type="time" id="time_end" name="time_end" value="<?= clean($timeEnd) ?>" required>
                             </div>
                         </div>
-
                         <div class="form-group span-2">
                             <label for="coordinator_name">Lead Coordinator <span class="required">*</span></label>
-                            <input type="text" id="coordinator_name" name="coordinator_name" placeholder="Coordinator Full Name" required>
+                            <input type="text" id="coordinator_name" name="coordinator_name" value="<?= clean($coordinatorName) ?>" placeholder="Coordinator Full Name" required>
                         </div>
                         <div class="form-group">
                             <label for="coordinator_phone">Coordinator Phone <span class="required">*</span></label>
-                            <input type="tel" id="coordinator_phone" name="coordinator_phone" placeholder="(000) 000-0000" maxlength="14" required>
+                            <input type="tel" id="coordinator_phone" name="coordinator_phone" value="<?= clean($coordinatorPhone) ?>" placeholder="(000) 000-0000" maxlength="14" required>
                         </div>
                         <div class="form-group">
                             <label for="coordinator_email">Coordinator Email <span class="required">*</span></label>
-                            <input type="email" id="coordinator_email" name="coordinator_email" placeholder="name@domain.gov" required>
+                            <input type="email" id="coordinator_email" name="coordinator_email" value="<?= clean($coordinatorEmail) ?>" placeholder="name@domain.gov" required>
                         </div>
                     </div>
 
@@ -74,15 +308,29 @@ declare(strict_types=1);
                             <button type="button" class="btn btn-secondary btn-sm" id="addLeaderBtn">+ Add Leader</button>
                         </div>
                         <div id="leadersList" class="dynamic-list">
-                            <div class="dynamic-row-personnel">
-                                <div class="person-name-field">
-                                    <input type="text" name="leader_names[]" placeholder="Leader Full Name & Title" required>
+                            <?php if (!empty($leaders)): ?>
+                                <?php foreach ($leaders as $l): ?>
+                                    <div class="dynamic-row-personnel">
+                                        <div class="person-name-field">
+                                            <input type="text" name="leader_names[]" value="<?= clean(is_array($l) ? ($l['name'] ?? '') : (string)$l) ?>" placeholder="Leader Full Name & Title" required>
+                                        </div>
+                                        <div class="person-org-field">
+                                            <input type="text" name="leader_orgs[]" value="<?= clean(is_array($l) ? ($l['org'] ?? '') : '') ?>" placeholder="Organization (e.g., DOE / FRNP)" required>
+                                        </div>
+                                        <button type="button" class="btn btn-icon btn-remove" title="Remove Leader">&times;</button>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="dynamic-row-personnel">
+                                    <div class="person-name-field">
+                                        <input type="text" name="leader_names[]" placeholder="Leader Full Name & Title" required>
+                                    </div>
+                                    <div class="person-org-field">
+                                        <input type="text" name="leader_orgs[]" placeholder="Organization (e.g., DOE / FRNP)" required>
+                                    </div>
+                                    <button type="button" class="btn btn-icon btn-remove" title="Remove Leader">&times;</button>
                                 </div>
-                                <div class="person-org-field">
-                                    <input type="text" name="leader_orgs[]" placeholder="Organization (e.g., DOE / FRNP)" required>
-                                </div>
-                                <button type="button" class="btn btn-icon btn-remove" title="Remove Leader">&times;</button>
-                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -98,7 +346,6 @@ declare(strict_types=1);
                     <button type="button" class="btn btn-secondary btn-sm" id="addParticipantBtn">+ Add Participant</button>
                 </div>
                 <div class="card-body">
-                    <!-- Same Organization Toggle Control -->
                     <div class="same-org-panel">
                         <label class="checkbox-inline">
                             <input type="checkbox" id="sameOrgToggle">
@@ -108,17 +355,30 @@ declare(strict_types=1);
                             <input type="text" id="commonOrgInput" placeholder="Enter common organization for all participants...">
                         </div>
                     </div>
-
                     <div id="participantsList" class="dynamic-list">
-                        <div class="dynamic-row-personnel">
-                            <div class="person-name-field">
-                                <input type="text" name="participant_names[]" placeholder="Participant Full Name" required>
+                        <?php if (!empty($participants)): ?>
+                            <?php foreach ($participants as $p): ?>
+                                <div class="dynamic-row-personnel">
+                                    <div class="person-name-field">
+                                        <input type="text" name="participant_names[]" value="<?= clean(is_array($p) ? ($p['name'] ?? '') : (string)$p) ?>" placeholder="Participant Full Name" required>
+                                    </div>
+                                    <div class="person-org-field">
+                                        <input type="text" name="participant_orgs[]" class="participant-org-input" value="<?= clean(is_array($p) ? ($p['org'] ?? '') : '') ?>" placeholder="Organization / Agency" required>
+                                    </div>
+                                    <button type="button" class="btn btn-icon btn-remove" title="Remove Participant">&times;</button>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="dynamic-row-personnel">
+                                <div class="person-name-field">
+                                    <input type="text" name="participant_names[]" placeholder="Participant Full Name" required>
+                                </div>
+                                <div class="person-org-field">
+                                    <input type="text" name="participant_orgs[]" class="participant-org-input" placeholder="Organization / Agency" required>
+                                </div>
+                                <button type="button" class="btn btn-icon btn-remove" title="Remove Participant">&times;</button>
                             </div>
-                            <div class="person-org-field">
-                                <input type="text" name="participant_orgs[]" class="participant-org-input" placeholder="Organization / Agency" required>
-                            </div>
-                            <button type="button" class="btn btn-icon btn-remove" title="Remove Participant">&times;</button>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </section>
@@ -157,7 +417,7 @@ declare(strict_types=1);
                             <label><input type="checkbox" id="showLabels"> Labels</label>
                         </div>
                         <div class="control-item checkbox-item">
-                            <label><input type="checkbox" id="showArrows" name="show_arrows" value="1" checked> Arrows</label>
+                            <label><input type="checkbox" id="showArrows" name="show_arrows" value="1" <?= $showArrows ? 'checked' : '' ?>> Arrows</label>
                         </div>
                         <div class="control-actions">
                             <button type="button" class="btn btn-secondary btn-sm" id="undoPointBtn" title="Undo last action (Ctrl+Z)">&larr; Undo</button>
@@ -167,11 +427,18 @@ declare(strict_types=1);
                             <button type="button" class="btn btn-secondary btn-sm" id="resetBgBtn">Reset Base Map</button>
                         </div>
                     </div>
-
                     <div class="canvas-wrapper" id="canvasWrapper">
-                        <!-- Floating On-Canvas Mode & Navigation Controls -->
                         <div class="canvas-viewport-controls">
-                            <button type="button" class="zoom-btn active" id="panToolBtn" title="Pan / Move Map (Default)">✋</button>
+                            <button type="button" class="zoom-btn active" id="panToolBtn" title="Pan / Move Map (Default)">
+                                <svg class="pan-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="5 9 2 12 5 15"></polyline>
+                                    <polyline points="9 5 12 2 15 5"></polyline>
+                                    <polyline points="15 19 12 22 9 19"></polyline>
+                                    <polyline points="19 9 22 12 19 15"></polyline>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <line x1="12" y1="2" x2="12" y2="22"></line>
+                                </svg>
+                            </button>
                             <button type="button" class="zoom-btn" id="stopToolBtn" title="Place Tour Stop (Green Circle)">
                                 <span class="stop-tool-icon"></span>
                             </button>
@@ -180,11 +447,9 @@ declare(strict_types=1);
                                     <polyline points="4 19 9 9 15 15 20 5"/>
                                 </svg>
                             </button>
-
                             <div class="viewport-divider"></div>
-
                             <button type="button" class="zoom-btn" id="zoomInBtn" title="Zoom In (+)">+</button>
-                            <button type="button" class="zoom-btn" id="zoomOutBtn" title="Zoom Out (−)">&minus;</button>
+                            <button type="button" class="zoom-btn" id="zoomOutBtn" title="Zoom Out (–)">&minus;</button>
                             <button type="button" class="zoom-btn" id="zoomResetBtn" title="Reset View (Extents)">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -193,18 +458,16 @@ declare(strict_types=1);
                             </button>
                             <span class="zoom-level-badge" id="zoomLevelBadge">100%</span>
                         </div>
-
-                        <canvas id="routeCanvas" width="900" height="680"></canvas>
+                        <canvas id="routeCanvas" width="900" height="580"></canvas>
                         <div id="mapTooltip" class="map-tooltip" style="display: none;"></div>
                         <div id="gisStatusMessage" class="gis-status-banner" style="display: none;"></div>
                     </div>
-
                     <div class="canvas-hint flex-between">
                         <span id="canvasModeHelp"><strong>Pan Tool:</strong> Drag to move map. Scroll wheel to zoom in/out.</span>
                         <span id="canvasModeLabel" class="mode-label">Mode: Pan Map</span>
                     </div>
-
-                    <input type="hidden" id="route_image_data" name="route_image_data">
+                    <input type="hidden" id="route_image_data" name="route_image_data" value="<?= clean($routeImageData) ?>">
+                    <input type="hidden" id="map_state" name="map_state" value="<?= clean($mapState) ?>">
                 </div>
             </section>
 
@@ -213,7 +476,7 @@ declare(strict_types=1);
                 <div class="card-header flex-between">
                     <div>
                         <h2>4. Facility Stops & Itinerary Times</h2>
-                        <p class="section-desc">Reorder stops using ▲/▼ buttons. Each card can collapse or expand for easier management.</p>
+                        <p class="section-desc">Reorder stops using buttons. Each card can collapse or expand for easier management.</p>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" class="btn btn-secondary btn-sm" id="collapseAllBtn">Collapse All</button>
@@ -222,7 +485,6 @@ declare(strict_types=1);
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Real-Time Time Budget Tracker -->
                     <div class="time-budget-panel" id="timeBudgetPanel">
                         <div class="budget-stat">
                             <span class="budget-label">Total Tour Window:</span>
@@ -237,49 +499,91 @@ declare(strict_types=1);
                             <span class="budget-val" id="statRemaining">-- mins</span>
                         </div>
                     </div>
-
-                    <!-- Exceeded Time Alert Box -->
                     <div id="timeAlertBox" class="alert-box alert-danger" style="display: none;">
                         <strong>Time Exceeded Warning:</strong> The scheduled stops total <span id="alertAllocatedMins">0</span> minutes, which exceeds your total tour window of <span id="alertTotalMins">0</span> minutes by <span id="alertOverMins">0</span> minutes. Please edit the minute values below before finalizing.
                     </div>
-
                     <div id="stopsList" class="stops-container">
-                        <!-- Initial Stop Card: Collapsed by default, no pre-populated name or minutes -->
-                        <div class="stop-card dynamic-stop" data-expanded="false">
-                            <div class="stop-header">
-                                <div class="stop-header-left">
-                                    <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
-                                    <span class="stop-number">Stop 1</span>
-                                    <span class="stop-header-preview">New Stop</span>
-                                    <span class="stop-header-time-pill">-- min</span>
+                        <?php if (!empty($stops)): ?>
+                            <?php foreach ($stops as $idx => $s): 
+                                $sNum   = $idx + 1;
+                                $sName  = clean($s['name'] ?? '');
+                                $sMins  = (int)($s['minutes'] ?? 0);
+                                $sSme   = clean($s['sme'] ?? '');
+                                $sNotes = clean($s['notes'] ?? '');
+                            ?>
+                                <div class="stop-card dynamic-stop" data-expanded="false">
+                                    <div class="stop-header">
+                                        <div class="stop-header-left">
+                                            <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
+                                            <span class="stop-number">Stop <?= $sNum ?></span>
+                                            <span class="stop-header-preview"><?= $sName ?: 'New Stop' ?></span>
+                                            <span class="stop-header-time-pill"><?= $sMins > 0 ? $sMins . ' min' : '-- min' ?></span>
+                                        </div>
+                                        <div class="stop-header-actions">
+                                            <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
+                                            <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                            <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                                        </div>
+                                    </div>
+                                    <div class="stop-body">
+                                        <div class="stop-grid">
+                                            <div class="form-group span-2">
+                                                <label>Facility / Location Name <span class="required">*</span></label>
+                                                <input type="text" name="facility_names[]" class="facility-name-input" value="<?= $sName ?>" placeholder="e.g., C-300 Central Control Facility" required>
+                                            </div>
+                                            <div class="form-group span-2">
+                                                <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $sMins > 0 ? $sMins : '' ?>" min="0" max="1440" placeholder="e.g., 30">
+                                            </div>
+                                            <div class="form-group span-2">
+                                                <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                                <input type="text" name="facility_smes[]" value="<?= $sSme ?>" placeholder="e.g., Jane Smith, Senior Operations Engineer">
+                                            </div>
+                                            <div class="form-group span-2">
+                                                <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                                <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."><?= $sNotes ?></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="stop-header-actions">
-                                    <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
-                                    <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
-                                    <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="stop-card dynamic-stop" data-expanded="false">
+                                <div class="stop-header">
+                                    <div class="stop-header-left">
+                                        <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
+                                        <span class="stop-number">Stop 1</span>
+                                        <span class="stop-header-preview">New Stop</span>
+                                        <span class="stop-header-time-pill">-- min</span>
+                                    </div>
+                                    <div class="stop-header-actions">
+                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
+                                        <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                        <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                                    </div>
+                                </div>
+                                <div class="stop-body">
+                                    <div class="stop-grid">
+                                        <div class="form-group span-2">
+                                            <label>Facility / Location Name <span class="required">*</span></label>
+                                            <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30">
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                            <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Senior Operations Engineer">
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                            <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="stop-body">
-                                <div class="stop-grid">
-                                    <div class="form-group span-2">
-                                        <label>Facility / Location Name <span class="required">*</span></label>
-                                        <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
-                                    </div>
-                                    <div class="form-group span-2">
-                                        <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                        <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30" required>
-                                    </div>
-                                    <div class="form-group span-2">
-                                        <label>Subject Matter Expert (SME) at Stop (Optional)</label>
-                                        <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Senior Operations Engineer">
-                                    </div>
-                                    <div class="form-group span-2">
-                                        <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
-                                        <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </section>
@@ -291,16 +595,552 @@ declare(strict_types=1);
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <textarea name="general_notes" rows="4" placeholder="Enter badging requirements, security instructions, assembly points, transportation arrangements, or weather contingency plans..."></textarea>
+                        <textarea name="general_notes" rows="4" placeholder="Enter badging requirements, security instructions, assembly points, transportation arrangements, or weather contingency plans..."><?= clean($generalNotes) ?></textarea>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary btn-lg">Generate Tour Agenda & Report</button>
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitTourBtn">
+                            <?= $isEdit ? 'Save Changes & Update Tour' : 'Generate Tour Agenda & Report' ?>
+                        </button>
                     </div>
                 </div>
             </section>
         </form>
     </div>
 
+    <!-- Missing Stop Duration Validation Modal -->
+    <div id="missingDurationModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+            <div class="modal-header-banner">
+                <div class="modal-icon-badge">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+                <div class="modal-header-text">
+                    <h3 id="modalTitle">Missing Stop Duration</h3>
+                    <p>All general tour logistics and requirements are complete, but one or more itinerary stops are missing a scheduled duration.</p>
+                </div>
+            </div>
+            <div class="modal-body-content">
+                <span style="font-size: 13px; font-weight: 600; color: #334155;">Please enter durations (in minutes) for the following stops:</span>
+                <ul class="modal-stop-list" id="modalMissingStopsList"></ul>
+            </div>
+            <div class="modal-footer-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="modalDismissBtn">Dismiss</button>
+                <button type="button" class="btn btn-primary btn-sm" id="modalFixDurationsBtn">Fix Stop Durations &rarr;</button>
+            </div>
+        </div>
+    </div>
+
     <script src="assets/js/app.js"></script>
+
+    <!-- Client Script: Clear Stops, Time Budget, Exact Zoom Extent Sync, and Missing Duration Modal Validation -->
+    <script>
+        (function() {
+            const form = document.getElementById('tourForm');
+            const routeInput = document.getElementById('route_image_data');
+            const mapStateInput = document.getElementById('map_state');
+            const canvas = document.getElementById('routeCanvas');
+            const btn = document.getElementById('submitTourBtn');
+            const clearStopsBtn = document.getElementById('clearStopsBtn');
+
+            // Modal elements
+            const modal = document.getElementById('missingDurationModal');
+            const modalList = document.getElementById('modalMissingStopsList');
+            const modalDismissBtn = document.getElementById('modalDismissBtn');
+            const modalFixBtn = document.getElementById('modalFixDurationsBtn');
+
+            let currentMissingStops = [];
+
+            // JavaScript HTML escape function (resolves ReferenceError: clean is not defined)
+            function escapeHtml(text) {
+                if (!text) return '';
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return String(text).replace(/[&<>"']/g, m => map[m]);
+            }
+
+            // --- 1. Real-Time Time Budget Calculator ---
+            function updateTimeBudget() {
+                const timeStart = document.getElementById('time_start')?.value;
+                const timeEnd = document.getElementById('time_end')?.value;
+                const statTotalTour = document.getElementById('statTotalTour');
+                const statAllocated = document.getElementById('statAllocated');
+                const statRemaining = document.getElementById('statRemaining');
+                const alertBox = document.getElementById('timeAlertBox');
+
+                let totalMins = 0;
+                if (timeStart && timeEnd) {
+                    const [sh, sm] = timeStart.split(':').map(Number);
+                    const [eh, em] = timeEnd.split(':').map(Number);
+                    totalMins = (eh * 60 + em) - (sh * 60 + sm);
+                    if (totalMins < 0) totalMins += 24 * 60;
+                }
+
+                let allocatedMins = 0;
+                document.querySelectorAll('.facility-minutes-input').forEach(input => {
+                    const val = parseInt(input.value, 10);
+                    if (!isNaN(val) && val > 0) allocatedMins += val;
+                });
+
+                if (statTotalTour) statTotalTour.textContent = totalMins > 0 ? totalMins + ' mins' : '-- mins';
+                if (statAllocated) statAllocated.textContent = allocatedMins + ' mins';
+                if (statRemaining) {
+                    if (totalMins > 0) {
+                        const rem = totalMins - allocatedMins;
+                        statRemaining.textContent = rem + ' mins';
+                        statRemaining.style.color = rem < 0 ? '#dc2626' : '';
+                    } else {
+                        statRemaining.textContent = '-- mins';
+                    }
+                }
+                if (alertBox) {
+                    if (totalMins > 0 && allocatedMins > totalMins) {
+                        alertBox.style.display = 'block';
+                        const aAlloc = document.getElementById('alertAllocatedMins');
+                        const aTotal = document.getElementById('alertTotalMins');
+                        const aOver  = document.getElementById('alertOverMins');
+                        if (aAlloc) aAlloc.textContent = allocatedMins;
+                        if (aTotal) aTotal.textContent = totalMins;
+                        if (aOver)  aOver.textContent  = allocatedMins - totalMins;
+                    } else {
+                        alertBox.style.display = 'none';
+                    }
+                }
+            }
+
+            // --- 2. Remove Itinerary Stops when "Clear Stops" is Clicked ---
+            if (clearStopsBtn) {
+                clearStopsBtn.addEventListener('click', function() {
+                    const stopsList = document.getElementById('stopsList');
+                    if (stopsList) {
+                        stopsList.innerHTML = `
+                            <div class="stop-card dynamic-stop" data-expanded="false">
+                                <div class="stop-header">
+                                    <div class="stop-header-left">
+                                        <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
+                                        <span class="stop-number">Stop 1</span>
+                                        <span class="stop-header-preview">New Stop</span>
+                                        <span class="stop-header-time-pill">-- min</span>
+                                    </div>
+                                    <div class="stop-header-actions">
+                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
+                                        <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                        <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                                    </div>
+                                </div>
+                                <div class="stop-body">
+                                    <div class="stop-grid">
+                                        <div class="form-group span-2">
+                                            <label>Facility / Location Name <span class="required">*</span></label>
+                                            <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30">
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                            <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Senior Operations Engineer">
+                                        </div>
+                                        <div class="form-group span-2">
+                                            <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                            <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        updateTimeBudget();
+                    }
+                });
+            }
+
+            document.addEventListener('input', function(e) {
+                if (e.target.matches('#time_start, #time_end, .facility-minutes-input')) {
+                    updateTimeBudget();
+                }
+            });
+            setTimeout(updateTimeBudget, 200);
+
+            // --- 3. Missing Duration Modal Validation Logic ---
+            function checkOtherRequiredFields() {
+                document.querySelectorAll('.facility-minutes-input').forEach(el => el.removeAttribute('required'));
+
+                const requiredInputs = form.querySelectorAll('input[required]:not(.facility-minutes-input), select[required], textarea[required]');
+                for (let input of requiredInputs) {
+                    if (!input.checkValidity() || !input.value.trim()) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function getStopsWithoutDuration() {
+                const stopCards = document.querySelectorAll('#stopsList .stop-card');
+                const missing = [];
+
+                stopCards.forEach((card, index) => {
+                    const nameInput = card.querySelector('.facility-name-input');
+                    const minsInput = card.querySelector('.facility-minutes-input');
+                    const stopNum = index + 1;
+                    const stopName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : `Stop ${stopNum}`;
+
+                    const rawVal = minsInput ? minsInput.value.trim() : '';
+                    const parsed = parseInt(rawVal, 10);
+
+                    if (!rawVal || isNaN(parsed) || parsed <= 0) {
+                        missing.push({
+                            card: card,
+                            stopNum: stopNum,
+                            name: stopName,
+                            minsInput: minsInput
+                        });
+                    }
+                });
+
+                return missing;
+            }
+
+            function showModal(missingStops) {
+                currentMissingStops = missingStops;
+                if (!modal || !modalList) return;
+
+                modalList.innerHTML = '';
+                missingStops.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'modal-stop-item';
+                    li.innerHTML = `
+                        <div>
+                            <span class="modal-stop-badge">Stop ${item.stopNum}</span>
+                            <strong>${escapeHtml(item.name)}</strong>
+                        </div>
+                        <span class="modal-stop-needed">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            Duration needed
+                        </span>
+                    `;
+                    modalList.appendChild(li);
+                });
+
+                modal.style.display = 'flex';
+            }
+
+            function hideModal() {
+                if (modal) modal.style.display = 'none';
+            }
+
+            if (modalDismissBtn) {
+                modalDismissBtn.addEventListener('click', hideModal);
+            }
+
+            if (modalFixBtn) {
+                modalFixBtn.addEventListener('click', function() {
+                    hideModal();
+                    if (!currentMissingStops || currentMissingStops.length === 0) return;
+
+                    currentMissingStops.forEach(item => {
+                        item.card.setAttribute('data-expanded', 'true');
+                        const body = item.card.querySelector('.stop-body');
+                        if (body) body.style.display = 'block';
+
+                        const toggleBtn = item.card.querySelector('.btn-toggle-collapse');
+                        if (toggleBtn) toggleBtn.innerHTML = '&#9652;';
+
+                        if (item.minsInput) {
+                            item.minsInput.classList.add('input-error-highlight');
+                            item.minsInput.addEventListener('input', function() {
+                                item.minsInput.classList.remove('input-error-highlight');
+                            }, { once: true });
+                        }
+                    });
+
+                    const first = currentMissingStops[0];
+                    if (first && first.minsInput) {
+                        first.minsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => {
+                            first.minsInput.focus();
+                        }, 250);
+                    }
+                });
+            }
+
+            window.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+                    hideModal();
+                }
+            });
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) hideModal();
+                });
+            }
+
+            // --- 4. Map Route & Extent Synchronization ---
+            const initialSavedRoute = (routeInput?.value || '').trim();
+            const isEditMode = initialSavedRoute.startsWith('data:image/');
+            let userModifiedCanvas = false;
+            let isSubmitting = false;
+
+            let savedState = null;
+            if (mapStateInput && mapStateInput.value) {
+                try {
+                    savedState = JSON.parse(mapStateInput.value);
+                } catch (e) {}
+            }
+
+            function applyRestoredState() {
+                if (!savedState) return;
+
+                // 1. Restore routeLegs
+                if (Array.isArray(savedState.routeLegs) && savedState.routeLegs.length > 0) {
+                    if (Array.isArray(window.routeLegs)) {
+                        window.routeLegs.length = 0;
+                        savedState.routeLegs.forEach(l => window.routeLegs.push(l));
+                    } else {
+                        window.routeLegs = savedState.routeLegs.slice();
+                    }
+                }
+
+                // 2. Restore tourStops
+                if (Array.isArray(savedState.tourStops) && savedState.tourStops.length > 0) {
+                    if (Array.isArray(window.tourStops)) {
+                        window.tourStops.length = 0;
+                        savedState.tourStops.forEach(s => window.tourStops.push(s));
+                    } else {
+                        window.tourStops = savedState.tourStops.slice();
+                    }
+                }
+
+                // 3. Restore viewport transform
+                if (savedState.scale) {
+                    window.scale = savedState.scale;
+                    if (window.viewState) window.viewState.scale = savedState.scale;
+                }
+                if (savedState.offsetX !== undefined && savedState.offsetX !== null) {
+                    window.offsetX = savedState.offsetX;
+                    if (window.viewState) window.viewState.offsetX = savedState.offsetX;
+                }
+                if (savedState.offsetY !== undefined && savedState.offsetY !== null) {
+                    window.offsetY = savedState.offsetY;
+                    if (window.viewState) window.viewState.offsetY = savedState.offsetY;
+                }
+                if (savedState.viewState) {
+                    window.viewState = Object.assign(window.viewState || {}, savedState.viewState);
+                }
+
+                if (savedState.zoomPercent) {
+                    const badge = document.getElementById('zoomLevelBadge');
+                    if (badge) badge.textContent = savedState.zoomPercent + '%';
+                }
+
+                // 4. Trigger redraw in app.js
+                if (typeof window.restoreMapEngineState === 'function') {
+                    window.restoreMapEngineState(savedState);
+                } else if (typeof window.redrawCanvas === 'function') {
+                    window.redrawCanvas();
+                } else if (typeof window.renderMap === 'function') {
+                    window.renderMap();
+                } else if (typeof window.redraw === 'function') {
+                    window.redraw();
+                } else if (typeof window.render === 'function') {
+                    window.render();
+                } else if (typeof window.draw === 'function') {
+                    window.draw();
+                }
+            }
+
+            // Fallback for legacy records that only have a flat snapshot and no vector legs saved
+            let savedMapImageObj = null;
+            if (isEditMode && (!savedState || !savedState.routeLegs || savedState.routeLegs.length === 0)) {
+                savedMapImageObj = new Image();
+                savedMapImageObj.src = initialSavedRoute;
+
+                function renderSavedMapToCanvas() {
+                    if (userModifiedCanvas || !canvas || !savedMapImageObj) return;
+                    try {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(savedMapImageObj, 0, 0, canvas.width, canvas.height);
+                    } catch (err) {}
+                }
+
+                savedMapImageObj.onload = renderSavedMapToCanvas;
+                setTimeout(renderSavedMapToCanvas, 250);
+                setTimeout(renderSavedMapToCanvas, 600);
+                setTimeout(renderSavedMapToCanvas, 1200);
+            }
+
+            // Restore state across initial load and asynchronous GIS layer load completions
+            applyRestoredState();
+            window.addEventListener('load', () => setTimeout(applyRestoredState, 150));
+            setTimeout(applyRestoredState, 350);
+            setTimeout(applyRestoredState, 700);
+            setTimeout(applyRestoredState, 1200);
+
+            // Track any user interaction that alters the route or view
+            if (canvas) {
+                ['mousedown', 'touchstart', 'pointerdown', 'wheel'].forEach(evt => {
+                    canvas.addEventListener(evt, () => {
+                        userModifiedCanvas = true;
+                    }, { passive: true });
+                });
+            }
+
+            ['routeToolBtn', 'stopToolBtn', 'undoPointBtn', 'newLegBtn', 'clearCanvasBtn', 'clearStopsBtn', 'resetBgBtn', 'zoomInBtn', 'zoomOutBtn', 'zoomResetBtn'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('click', () => {
+                        userModifiedCanvas = true;
+                    });
+                }
+            });
+
+            function captureExactCanvas() {
+                if (!canvas) return '';
+                try {
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = canvas.width;
+                    offscreen.height = canvas.height;
+                    const ctx = offscreen.getContext('2d');
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+                    ctx.drawImage(canvas, 0, 0);
+
+                    const dataUrl = offscreen.toDataURL('image/png');
+                    if (dataUrl && dataUrl.length > 200) {
+                        return dataUrl;
+                    }
+                } catch (e) {
+                    try {
+                        return canvas.toDataURL('image/png');
+                    } catch (err) {}
+                }
+                return '';
+            }
+
+            function syncCurrentMapExtent() {
+                if (typeof window.getMapEngineState === 'function') {
+                    try {
+                        const engineState = window.getMapEngineState();
+                        if (engineState) {
+                            if (engineState.scale !== undefined) window.scale = engineState.scale;
+                            if (engineState.offsetX !== undefined) window.offsetX = engineState.offsetX;
+                            if (engineState.offsetY !== undefined) window.offsetY = engineState.offsetY;
+                            if (engineState.routeLegs) window.routeLegs = engineState.routeLegs;
+                            if (engineState.tourStops) window.tourStops = engineState.tourStops;
+                        }
+                    } catch (e) {}
+                }
+
+                const badge = document.getElementById('zoomLevelBadge');
+                const badgeVal = badge ? parseInt(badge.textContent, 10) : null;
+
+                const curScale = window.scale || (window.viewState ? window.viewState.scale : null);
+                const curOffX = window.offsetX !== undefined ? window.offsetX : (window.viewState ? window.viewState.offsetX : null);
+                const curOffY = window.offsetY !== undefined ? window.offsetY : (window.viewState ? window.viewState.offsetY : null);
+
+                const state = {
+                    viewState: window.viewState || null,
+                    scale: curScale,
+                    offsetX: curOffX,
+                    offsetY: curOffY,
+                    zoomPercent: badgeVal,
+                    routeLegs: window.routeLegs || [],
+                    tourStops: window.tourStops || []
+                };
+
+                if (mapStateInput) {
+                    mapStateInput.value = JSON.stringify(state);
+                }
+
+                const snap = captureExactCanvas();
+                if (snap && snap.length > 200) {
+                    routeInput.value = snap;
+                    routeInput.setAttribute('value', snap);
+                }
+
+                return snap;
+            }
+            window.syncCurrentMapExtent = syncCurrentMapExtent;
+
+            // Block conflicting scripts from resetting view extents during submission
+            if (typeof window.zoomReset === 'function') {
+                const origZoomReset = window.zoomReset;
+                window.zoomReset = function() {
+                    if (isSubmitting) return;
+                    return origZoomReset.apply(this, arguments);
+                };
+            }
+            if (typeof window.resetView === 'function') {
+                const origResetView = window.resetView;
+                window.resetView = function() {
+                    if (isSubmitting) return;
+                    return origResetView.apply(this, arguments);
+                };
+            }
+
+            function validateAndIntercept(e) {
+                document.querySelectorAll('.facility-minutes-input').forEach(el => el.removeAttribute('required'));
+
+                const othersValid = checkOtherRequiredFields();
+                if (!othersValid) {
+                    if (typeof form.reportValidity === 'function') {
+                        form.reportValidity();
+                    }
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                    return false;
+                }
+
+                const missing = getStopsWithoutDuration();
+                if (missing.length > 0) {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                    }
+                    showModal(missing);
+                    return false;
+                }
+
+                isSubmitting = true;
+                syncCurrentMapExtent();
+                return true;
+            }
+
+            if (btn) {
+                btn.addEventListener('click', function(e) {
+                    if (!validateAndIntercept(e)) {
+                        return false;
+                    }
+                }, true);
+            }
+
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    if (!validateAndIntercept(e)) {
+                        return false;
+                    }
+                }, true);
+
+                const origFormSubmit = form.submit;
+                form.submit = function() {
+                    if (validateAndIntercept(null)) {
+                        return origFormSubmit.apply(form, arguments);
+                    }
+                };
+            }
+        })();
+    </script>
 </body>
 </html>
