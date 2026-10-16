@@ -795,7 +795,7 @@ textarea {
 }
 
 .cover-logo {
-    max-width: 220px;
+    max-width: 400px;
     max-height: 220px;
     height: auto;
     display: block;
@@ -822,10 +822,10 @@ textarea {
 }
 
 .cover-rule {
-    width: 80px;
-    height: 3px;
+    width: 240px;
+    height: 1px;
     background-color: #1f1f1f;
-    margin: 0 auto 20px auto;
+    margin: 20px auto 20px auto;
 }
 
 .cover-date {
@@ -841,11 +841,6 @@ textarea {
     font-weight: 500;
 }
 
-.cover-footer-note {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 48px;
-}
 
 .bullet-sep {
     margin: 0 8px;
@@ -1077,4 +1072,49 @@ textarea {
     .report-map-img {
         max-height: 220px !important;
     }
+}
+/* --- Cover Page Layout --- */
+.cover-page,
+.page-cover {
+    position: relative;
+    height: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+/* Ensure the footer note sits at the bottom of the page */
+.cover-footer-note {
+    position: relative;
+    top: 200px;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* --- Section 3 & Route Image Sizing / Page Breaks --- */
+/* Force the route image to 100% page width */
+.tour-route-image,
+.section-3 img,
+#route-image {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto;
+    display: block;
+}
+
+/* Prevent Section 3 from splitting across pages.
+   If Sections 1 & 2 leave insufficient room, Section 3 and the image 
+   will move together to the next page. */
+.section-3,
+.section-3-container {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.section-3 h2,
+.section-3 .section-title,
+.section-3 .section-header {
+    page-break-after: avoid;
+    break-after: avoid;
 }
