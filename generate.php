@@ -402,7 +402,7 @@ $hasRouteMap = is_string($routeImageData) && (
         <header class="report-header">
             <div class="report-meta-top">
                 <span class="badge">TOUR AGENDA & BRIEFING</span>
-                <span class="report-date">TOUR DATE: <?= $formattedDate ?></span>
+                <span class="report-date">Date of Tour: <?= $formattedDate ?></span>
             </div>
             <h2 class="report-title-page2"><?= $tourTitle ?> Tour</h2>
             <div class="report-details-grid">
