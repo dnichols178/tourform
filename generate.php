@@ -269,43 +269,42 @@ $stopCounter = 1;
 foreach ($rawStops as $idx => $s) {
     $name = $s['name'] ?? '';
     $minutes = (int)($s['minutes'] ?? 0);
-    // Only add to total minutes if it is NOT the first row
-    if ($idx !== 0) {
-        $totalAllocatedMinutes += $minutes;
-    }
     $isStart = ($idx === 0) || !empty($s['is_start']);
     $arrivalTime = trim((string)($s['arrival_time'] ?? ''));
 
-    // If this is the default Start location and no arrival time was explicitly provided,
-    // default to the tour's scheduled start time ($timeStart)
-    if ($isStart && $arrivalTime === '' && !empty($timeStart)) {
-        $arrivalTime = $timeStart;
-    }
-
-    // 1. Arrival Time column: 9:30 AM format, or N/A if not listed
-    $arrivalDisplay = 'N/A';
-    if ($arrivalTime !== '') {
-        $formattedArrival = formatTime12($arrivalTime);
-        $arrivalDisplay = $formattedArrival !== '' ? $formattedArrival : 'N/A';
-    }
-
-    // 2. Duration column: Minutes with calculated departure time suffix
-        if ($idx === 0) {
+    // Row 1 / Tour Start
+    if ($idx === 0) {
+        // Arrival time is empty (shown as "--")
+        $arrivalDisplay = '--';
+        // Duration reads "Tour Start"
         $durationDisplay = 'Tour Start';
-		} elseif ($minutes > 0) {
-        $unit = ($minutes === 1) ? 'minute' : 'minutes';
-        if ($arrivalTime !== '') {
-            $depFormatted = calculateDepartureTime($arrivalTime, $minutes);
-            if ($depFormatted !== '') {
-                $durationDisplay = "{$minutes} {$unit}";
-            } else {
-                $durationDisplay = "{$minutes} {$unit}";
-            }
-        } else {
-            $durationDisplay = "{$minutes} {$unit}";
-        }
+        // Departure is the tour start time
+        $depSourceTime = !empty($timeStart) ? $timeStart : $arrivalTime;
+        $depFormatted = formatTime12($depSourceTime);
+        $departDisplay = $depFormatted !== '' ? $depFormatted : '--';
     } else {
-        $durationDisplay = '0 minutes';
+        // Subsequent rows
+        $totalAllocatedMinutes += $minutes;
+
+        // Arrival time from create.php
+        if ($arrivalTime !== '') {
+            $formattedArrival = formatTime12($arrivalTime);
+            $arrivalDisplay = $formattedArrival !== '' ? $formattedArrival : '--';
+        } else {
+            $arrivalDisplay = '--';
+        }
+
+        // Duration display
+        $unit = ($minutes === 1) ? 'minute' : 'minutes';
+        $durationDisplay = "{$minutes} {$unit}";
+
+        // Calculated departure time: Arrival + Duration
+        if ($arrivalTime !== '') {
+            $depCalculated = calculateDepartureTime($arrivalTime, $minutes);
+            $departDisplay = $depCalculated !== '' ? $depCalculated : '--';
+        } else {
+            $departDisplay = '--';
+        }
     }
 
     $stops[] = [
@@ -314,7 +313,7 @@ foreach ($rawStops as $idx => $s) {
         'minutes'          => $minutes,
         'arrival_display'  => $arrivalDisplay,
         'duration_display' => $durationDisplay,
-		'depart_display'   => $depFormatted,
+        'depart_display'   => $departDisplay,
         'arrival_time'     => $arrivalTime,
         'is_start'         => $isStart,
         'sme'              => $s['sme'] ?? '',
@@ -560,7 +559,7 @@ $hasRouteMap = is_string($routeImageData) && (
                         <tr>
                             <th style="width: 14%;">Arrival Time</th>
                             <th style="width: 14%;">Duration</th>
-							<th style="width: 14%;">Departure</th>
+                            <th style="width: 14%;">Departure</th>
                             <th style="width: 25%;">Location</th>
                             <th style="width: 19%;">Subject Matter Expert (SME)</th>
                             <th style="width: 19%;">PPE & Requirements</th>
@@ -571,11 +570,8 @@ $hasRouteMap = is_string($routeImageData) && (
                             <tr class="<?= !empty($stop['is_start']) ? 'highlight-start-row' : '' ?>">
                                 <td><?= clean($stop['arrival_display']) ?></td>
                                 <td><?= clean($stop['duration_display']) ?></td>
-								<td><?= clean($stop['depart_display']) ?></td>
+                                <td><?= clean($stop['depart_display']) ?></td>
                                 <td>
-                                    <!--<?php if (!empty($stop['is_start'])): ?>
-                                        <span class="start-location-badge">Start</span>
-                                    <?php endif; ?>-->
                                     <strong><?= clean($stop['name']) ?></strong>
                                 </td>
                                 <td><?= $stop['sme'] ?: '<em>None designated</em>' ?></td>
