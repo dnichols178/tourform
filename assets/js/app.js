@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Create a new Stop Card (Collapsed by default)
+    // Create a new Stop Card (Expanded by default when added)
     function addFacilityStop(prefillName = '') {
         if (!stopsList) return null;
         const currentCount = stopsList.querySelectorAll('.dynamic-stop').length + 1;
@@ -216,12 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const stopDiv = document.createElement('div');
         stopDiv.className = 'stop-card dynamic-stop';
         stopDiv.setAttribute('data-is-start', '0');
-        stopDiv.setAttribute('data-expanded', 'false');
+        stopDiv.setAttribute('data-expanded', 'true');
         stopDiv.innerHTML = `
             <input type="hidden" name="facility_is_start[]" value="0">
             <div class="stop-header">
                 <div class="stop-header-left">
-                    <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
+                    <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
                     <span class="stop-number">Stop ${currentCount}</span>
                     <span class="stop-header-preview">${displayName}</span>
                     <span class="stop-header-time-pill">-- min</span>
@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
                 </div>
             </div>
-            <div class="stop-body">
+            <div class="stop-body" style="display: block;">
                 <div class="stop-grid">
                     <div class="form-group span-2">
                         <label>Facility / Location Name <span class="required">*</span></label>
@@ -262,11 +262,25 @@ document.addEventListener('DOMContentLoaded', () => {
         stopsList.appendChild(stopDiv);
         renumberStops();
         recalculateTimeBudget();
+
+        stopDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const nameInput = stopDiv.querySelector('.facility-name-input');
+        if (nameInput) {
+            setTimeout(() => nameInput.focus(), 150);
+        }
+
         return stopDiv;
     }
 
+    // Single-instance Add Stop button binding with de-duplication
     if (addStopBtn) {
-        addStopBtn.addEventListener('click', () => addFacilityStop(''));
+        const cleanAddStopBtn = addStopBtn.cloneNode(true);
+        addStopBtn.replaceWith(cleanAddStopBtn);
+        cleanAddStopBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            addFacilityStop('');
+        });
     }
 
     if (collapseAllBtn) {
@@ -291,6 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.closest('.stop-header') && !e.target.closest('.btn-reorder') && !e.target.closest('.btn-remove-stop')) {
                 const isExpanded = stopCard.getAttribute('data-expanded') === 'true';
                 stopCard.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
+                const body = stopCard.querySelector('.stop-body');
+                if (body) body.style.display = isExpanded ? 'none' : 'block';
+                const toggle = stopCard.querySelector('.btn-toggle-collapse');
+                if (toggle) toggle.innerHTML = isExpanded ? '&#9662;' : '&#9652;';
                 return;
             }
 
@@ -1030,11 +1048,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: formattedLabel
                     });
 
-                    const nameInputs = Array.from(document.querySelectorAll('.facility-name-input'));
-                    const emptyInput = nameInputs.find(inp => inp.value.trim() === '');
-                    if (emptyInput) {
-                        emptyInput.value = formattedLabel;
-                        const card = emptyInput.closest('.dynamic-stop');
+                    // ISOLATE START LOCATION: Never populate the default Start Location from map clicks.
+                    // Filter to non-start cards only:
+                    const nonStartCards = Array.from(document.querySelectorAll('.dynamic-stop')).filter(card => card.getAttribute('data-is-start') !== '1');
+                    const emptyNonStart = nonStartCards.map(c => c.querySelector('.facility-name-input')).find(inp => inp && inp.value.trim() === '');
+
+                    if (emptyNonStart) {
+                        emptyNonStart.value = formattedLabel;
+                        const card = emptyNonStart.closest('.dynamic-stop');
                         if (card) {
                             const preview = card.querySelector('.stop-header-preview');
                             if (preview) preview.textContent = formattedLabel;
@@ -1235,15 +1256,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentMode === 'stop' && stopsMarkers.length > 0) {
             stopsMarkers.pop();
             const stopCards = stopsList ? stopsList.querySelectorAll('.dynamic-stop') : [];
+            // Never remove or alter the initial Start stop card on map undo
             if (stopCards.length > 1) {
                 stopCards[stopCards.length - 1].remove();
                 renumberStops();
                 recalculateTimeBudget();
-            } else if (stopCards.length === 1) {
-                const nameInput = stopCards[0].querySelector('.facility-name-input');
-                if (nameInput) nameInput.value = '';
-                const preview = stopCards[0].querySelector('.stop-header-preview');
-                if (preview) preview.textContent = 'Start Location (Required)';
             }
             render(true);
             return;
@@ -1282,9 +1299,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Clear Stops: Reset stop markers and reset DOM stops back to empty Start stop
     if (clearStopsBtn) {
         clearStopsBtn.addEventListener('click', () => {
             stopsMarkers = [];
+            if (stopsList) {
+                stopsList.innerHTML = `
+                    <div class="stop-card dynamic-stop is-start-stop" data-is-start="1" data-expanded="true">
+                        <input type="hidden" name="facility_is_start[]" value="1">
+                        <div class="stop-header">
+                            <div class="stop-header-left">
+                                <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
+                                <span class="badge-start-stop">Start</span>
+                                <span class="stop-number">Start Location</span>
+                                <span class="stop-header-preview">Start Location (Required)</span>
+                                <span class="stop-header-time-pill">-- min</span>
+                            </div>
+                            <div class="stop-header-actions">
+                                <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
+                                <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                            </div>
+                        </div>
+                        <div class="stop-body" style="display: block;">
+                            <div class="stop-grid">
+                                <div class="form-group span-2">
+                                    <label>Start Facility / Muster Location Name <span class="required">*</span></label>
+                                    <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-100 Administration Building / Muster Point" required>
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                    <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 0 for Muster or 15 for Briefing" required>
+                                </div>
+                                <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
+                                <div class="form-group span-2">
+                                    <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                    <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Tour Coordinator">
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                    <textarea name="facility_notes[]" rows="2" placeholder="Badging, general site safety orientation, muster instructions..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            renumberStops();
+            recalculateTimeBudget();
             render(false);
         });
     }
