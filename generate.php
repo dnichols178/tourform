@@ -269,7 +269,10 @@ $stopCounter = 1;
 foreach ($rawStops as $idx => $s) {
     $name = $s['name'] ?? '';
     $minutes = (int)($s['minutes'] ?? 0);
-    $totalAllocatedMinutes += $minutes;
+    // Only add to total minutes if it is NOT the first row
+    if ($idx !== 0) {
+        $totalAllocatedMinutes += $minutes;
+    }
     $isStart = ($idx === 0) || !empty($s['is_start']);
     $arrivalTime = trim((string)($s['arrival_time'] ?? ''));
 
@@ -287,7 +290,9 @@ foreach ($rawStops as $idx => $s) {
     }
 
     // 2. Duration column: Minutes with calculated departure time suffix
-    if ($minutes > 0) {
+        if ($idx === 0) {
+        $durationDisplay = 'Tour Start';
+		} elseif ($minutes > 0) {
         $unit = ($minutes === 1) ? 'minute' : 'minutes';
         if ($arrivalTime !== '') {
             $depFormatted = calculateDepartureTime($arrivalTime, $minutes);
@@ -553,8 +558,8 @@ $hasRouteMap = is_string($routeImageData) && (
                     <thead>
                         <tr>
                             <th style="width: 14%;">Arrival Time</th>
-                            <th style="width: 25%;">Duration</th>
-                            <th style="width: 23%;">Location</th>
+                            <th style="width: 14%;">Duration</th>
+                            <th style="width: 25%;">Location</th>
                             <th style="width: 19%;">Subject Matter Expert (SME)</th>
                             <th style="width: 19%;">PPE & Requirements</th>
                         </tr>
@@ -565,9 +570,9 @@ $hasRouteMap = is_string($routeImageData) && (
                                 <td><?= clean($stop['arrival_display']) ?></td>
                                 <td><?= clean($stop['duration_display']) ?></td>
                                 <td>
-                                    <?php if (!empty($stop['is_start'])): ?>
+                                    <!--<?php if (!empty($stop['is_start'])): ?>
                                         <span class="start-location-badge">Start</span>
-                                    <?php endif; ?>
+                                    <?php endif; ?>-->
                                     <strong><?= clean($stop['name']) ?></strong>
                                 </td>
                                 <td><?= $stop['sme'] ?: '<em>None designated</em>' ?></td>
