@@ -115,7 +115,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             vertical-align: middle;
         }
 
-        /* Highlight state for inputs flagged with missing duration */
+        /* Start Stop Distinct Styling */
+        .stop-card.is-start-stop {
+            border-left: 4px solid #16a34a !important;
+            background: #fcfdfc;
+        }
+        .badge-start-stop {
+            background: #16a34a;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Highlight state for inputs flagged with missing duration or arrival */
         .input-error-highlight {
             border-color: #dc2626 !important;
             background-color: #fef2f2 !important;
@@ -123,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             transition: all 0.2s ease-in-out !important;
         }
 
-        /* Missing Duration Feedback Modal Styles */
+        /* Missing Stop Requirements Feedback Modal Styles */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -143,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             background: #ffffff;
             border-radius: 12px;
             width: 100%;
-            max-width: 520px;
+            max-width: 540px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
             overflow: hidden;
             border: 1px solid #e2e8f0;
@@ -505,36 +521,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     <div id="stopsList" class="stops-container">
                         <?php if (!empty($stops)): ?>
                             <?php foreach ($stops as $idx => $s): 
-                                $sNum   = $idx + 1;
-                                $sName  = clean($s['name'] ?? '');
-                                $sMins  = (int)($s['minutes'] ?? 0);
-                                $sSme   = clean($s['sme'] ?? '');
-                                $sNotes = clean($s['notes'] ?? '');
+                                $isStart = ($idx === 0) || !empty($s['is_start']);
+                                $sNum    = $idx + 1;
+                                $sName   = clean($s['name'] ?? '');
+                                $sMins   = isset($s['minutes']) && $s['minutes'] !== '' ? (int)$s['minutes'] : '';
+                                $sSme    = clean($s['sme'] ?? '');
+                                $sNotes  = clean($s['notes'] ?? '');
+                                $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
                             ?>
-                                <div class="stop-card dynamic-stop" data-expanded="false">
+                                <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="false">
+                                    <input type="hidden" name="facility_is_start[]" value="<?= $isStart ? '1' : '0' ?>">
                                     <div class="stop-header">
                                         <div class="stop-header-left">
                                             <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
-                                            <span class="stop-number">Stop <?= $sNum ?></span>
-                                            <span class="stop-header-preview"><?= $sName ?: 'New Stop' ?></span>
-                                            <span class="stop-header-time-pill"><?= $sMins > 0 ? $sMins . ' min' : '-- min' ?></span>
+                                            <?php if ($isStart): ?>
+                                                <span class="badge-start-stop">Start</span>
+                                                <span class="stop-number">Start Location</span>
+                                            <?php else: ?>
+                                                <span class="stop-number">Stop <?= $sNum ?></span>
+                                            <?php endif; ?>
+                                            <span class="stop-header-preview"><?= $sName ?: ($isStart ? 'Start Location (Required)' : 'New Stop') ?></span>
+                                            <span class="stop-header-time-pill"><?= ($sMins !== '' && $sMins >= 0) ? $sMins . ' min' : '-- min' ?></span>
                                         </div>
                                         <div class="stop-header-actions">
                                             <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
                                             <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
-                                            <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                                            <?php if (!$isStart): ?>
+                                                <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                     <div class="stop-body">
                                         <div class="stop-grid">
                                             <div class="form-group span-2">
-                                                <label>Facility / Location Name <span class="required">*</span></label>
-                                                <input type="text" name="facility_names[]" class="facility-name-input" value="<?= $sName ?>" placeholder="e.g., C-300 Central Control Facility" required>
+                                                <label><?= $isStart ? 'Start Facility / Muster Location Name' : 'Facility / Location Name' ?> <span class="required">*</span></label>
+                                                <input type="text" name="facility_names[]" class="facility-name-input" value="<?= $sName ?>" placeholder="<?= $isStart ? 'e.g., C-100 Administration Building / Muster Point' : 'e.g., C-300 Central Control Facility' ?>" required>
                                             </div>
                                             <div class="form-group span-2">
                                                 <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $sMins > 0 ? $sMins : '' ?>" min="0" max="1440" placeholder="e.g., 30">
+                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= ($sMins !== '' && $sMins >= 0) ? $sMins : '' ?>" min="0" max="1440" placeholder="e.g., 0 for Muster/Briefing or 30" required>
                                             </div>
+                                            <?php if (!$isStart): ?>
+                                                <div class="form-group span-2 arrival-time-group">
+                                                    <label>Arrival Time <span class="arrival-required-star required" style="<?= ($sMins !== '' && (int)$sMins > 0) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
+                                                    <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= $sArrival ?>" <?= ($sMins !== '' && (int)$sMins > 0) ? 'required' : '' ?>>
+                                                    <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Required if duration is greater than 0 minutes. If 0 minutes, arrival time is optional.</small>
+                                                </div>
+                                            <?php else: ?>
+                                                <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
+                                            <?php endif; ?>
                                             <div class="form-group span-2">
                                                 <label>Subject Matter Expert (SME) at Stop (Optional)</label>
                                                 <input type="text" name="facility_smes[]" value="<?= $sSme ?>" placeholder="e.g., Jane Smith, Senior Operations Engineer">
@@ -548,37 +583,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                 </div>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <div class="stop-card dynamic-stop" data-expanded="false">
+                            <!-- Default Initial Start Stop (No inputs pre-filled, but required) -->
+                            <div class="stop-card dynamic-stop is-start-stop" data-is-start="1" data-expanded="true">
+                                <input type="hidden" name="facility_is_start[]" value="1">
                                 <div class="stop-header">
                                     <div class="stop-header-left">
-                                        <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
-                                        <span class="stop-number">Stop 1</span>
-                                        <span class="stop-header-preview">New Stop</span>
+                                        <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
+                                        <span class="badge-start-stop">Start</span>
+                                        <span class="stop-number">Start Location</span>
+                                        <span class="stop-header-preview">Start Location (Required)</span>
                                         <span class="stop-header-time-pill">-- min</span>
                                     </div>
                                     <div class="stop-header-actions">
-                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
+                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
                                         <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
-                                        <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
                                     </div>
                                 </div>
-                                <div class="stop-body">
+                                <div class="stop-body" style="display: block;">
                                     <div class="stop-grid">
                                         <div class="form-group span-2">
-                                            <label>Facility / Location Name <span class="required">*</span></label>
-                                            <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
+                                            <label>Start Facility / Muster Location Name <span class="required">*</span></label>
+                                            <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-100 Administration Building / Muster Point" required>
                                         </div>
                                         <div class="form-group span-2">
                                             <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30">
+                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 0 for Muster or 15 for Briefing" required>
                                         </div>
+                                        <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
                                         <div class="form-group span-2">
                                             <label>Subject Matter Expert (SME) at Stop (Optional)</label>
-                                            <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Senior Operations Engineer">
+                                            <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Tour Coordinator">
                                         </div>
                                         <div class="form-group span-2">
                                             <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
-                                            <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
+                                            <textarea name="facility_notes[]" rows="2" placeholder="Badging, general site safety orientation, muster instructions..."></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -607,7 +645,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
         </form>
     </div>
 
-    <!-- Missing Stop Duration Validation Modal -->
+    <!-- Missing Stop Requirements Validation Modal -->
     <div id="missingDurationModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-card">
             <div class="modal-header-banner">
@@ -618,24 +656,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     </svg>
                 </div>
                 <div class="modal-header-text">
-                    <h3 id="modalTitle">Missing Stop Duration</h3>
-                    <p>All general tour logistics and requirements are complete, but one or more itinerary stops are missing a scheduled duration.</p>
+                    <h3 id="modalTitle">Itinerary Details Required</h3>
+                    <p>All general tour logistics are complete, but one or more itinerary stops need mandatory location, duration (0 or more mins), or arrival times.</p>
                 </div>
             </div>
             <div class="modal-body-content">
-                <span style="font-size: 13px; font-weight: 600; color: #334155;">Please enter durations (in minutes) for the following stops:</span>
+                <span style="font-size: 13px; font-weight: 600; color: #334155;">Please complete the highlighted items for the following stops:</span>
                 <ul class="modal-stop-list" id="modalMissingStopsList"></ul>
             </div>
             <div class="modal-footer-actions">
                 <button type="button" class="btn btn-secondary btn-sm" id="modalDismissBtn">Dismiss</button>
-                <button type="button" class="btn btn-primary btn-sm" id="modalFixDurationsBtn">Fix Stop Durations &rarr;</button>
+                <button type="button" class="btn btn-primary btn-sm" id="modalFixDurationsBtn">Fix Stop Details &rarr;</button>
             </div>
         </div>
     </div>
 
     <script src="assets/js/app.js"></script>
 
-    <!-- Client Script: Clear Stops, Time Budget, Exact Zoom Extent Sync, and Missing Duration Modal Validation -->
+    <!-- Client Script: Clear Stops, Time Budget, Exact Zoom Extent Sync, Dynamic Arrival Validation, and Modal Interceptor -->
     <script>
         (function() {
             const form = document.getElementById('tourForm');
@@ -644,6 +682,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             const canvas = document.getElementById('routeCanvas');
             const btn = document.getElementById('submitTourBtn');
             const clearStopsBtn = document.getElementById('clearStopsBtn');
+            const addStopBtn = document.getElementById('addStopBtn');
 
             // Modal elements
             const modal = document.getElementById('missingDurationModal');
@@ -653,7 +692,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
 
             let currentMissingStops = [];
 
-            // JavaScript HTML escape function (resolves ReferenceError: clean is not defined)
             function escapeHtml(text) {
                 if (!text) return '';
                 const map = {
@@ -664,6 +702,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     "'": '&#039;'
                 };
                 return String(text).replace(/[&<>"']/g, m => map[m]);
+            }
+
+            // --- Dynamic Arrival Time & Duration Coupling ---
+            function syncStopFieldValidation(card) {
+                if (!card) return;
+                const isStart = card.getAttribute('data-is-start') === '1';
+                const minsInput = card.querySelector('.facility-minutes-input');
+                const arrivalInput = card.querySelector('.facility-arrival-input');
+                const star = card.querySelector('.arrival-required-star');
+
+                if (isStart || !arrivalInput) return;
+
+                const val = minsInput ? parseInt(minsInput.value.trim(), 10) : 0;
+                if (!isNaN(val) && val > 0) {
+                    arrivalInput.required = true;
+                    if (star) star.style.display = 'inline';
+                } else {
+                    arrivalInput.required = false;
+                    arrivalInput.classList.remove('input-error-highlight');
+                    if (star) star.style.display = 'none';
+                }
+            }
+
+            function reindexStops() {
+                const stopCards = document.querySelectorAll('#stopsList .stop-card');
+                stopCards.forEach((card, idx) => {
+                    const isStart = (idx === 0);
+                    card.setAttribute('data-is-start', isStart ? '1' : '0');
+                    const hiddenIsStart = card.querySelector('input[name="facility_is_start[]"]');
+                    if (hiddenIsStart) hiddenIsStart.value = isStart ? '1' : '0';
+
+                    const headerLeft = card.querySelector('.stop-header-left');
+                    const numLabel = card.querySelector('.stop-number');
+                    const preview = card.querySelector('.stop-header-preview');
+                    const nameInput = card.querySelector('.facility-name-input');
+                    const valName = nameInput ? nameInput.value.trim() : '';
+
+                    let startBadge = card.querySelector('.badge-start-stop');
+                    if (isStart) {
+                        card.classList.add('is-start-stop');
+                        if (!startBadge && headerLeft) {
+                            startBadge = document.createElement('span');
+                            startBadge.className = 'badge-start-stop';
+                            startBadge.textContent = 'Start';
+                            const toggleBtn = card.querySelector('.btn-toggle-collapse');
+                            if (toggleBtn && toggleBtn.nextSibling) {
+                                headerLeft.insertBefore(startBadge, toggleBtn.nextSibling);
+                            }
+                        }
+                        if (numLabel) numLabel.textContent = 'Start Location';
+                        if (preview) preview.textContent = valName || 'Start Location (Required)';
+                        const removeBtn = card.querySelector('.btn-remove-stop');
+                        if (removeBtn) removeBtn.style.display = 'none';
+                    } else {
+                        card.classList.remove('is-start-stop');
+                        if (startBadge) startBadge.remove();
+                        if (numLabel) numLabel.textContent = `Stop ${idx + 1}`;
+                        if (preview) preview.textContent = valName || 'New Stop';
+                        const removeBtn = card.querySelector('.btn-remove-stop');
+                        if (removeBtn) removeBtn.style.display = 'inline-flex';
+                    }
+                    syncStopFieldValidation(card);
+                });
             }
 
             // --- 1. Real-Time Time Budget Calculator ---
@@ -715,50 +816,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 }
             }
 
-            // --- 2. Remove Itinerary Stops when "Clear Stops" is Clicked ---
+            // Generate default "Start" stop markup
+            function getDefaultStartStopHtml() {
+                return `
+                    <div class="stop-card dynamic-stop is-start-stop" data-is-start="1" data-expanded="true">
+                        <input type="hidden" name="facility_is_start[]" value="1">
+                        <div class="stop-header">
+                            <div class="stop-header-left">
+                                <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
+                                <span class="badge-start-stop">Start</span>
+                                <span class="stop-number">Start Location</span>
+                                <span class="stop-header-preview">Start Location (Required)</span>
+                                <span class="stop-header-time-pill">-- min</span>
+                            </div>
+                            <div class="stop-header-actions">
+                                <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
+                                <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                            </div>
+                        </div>
+                        <div class="stop-body" style="display: block;">
+                            <div class="stop-grid">
+                                <div class="form-group span-2">
+                                    <label>Start Facility / Muster Location Name <span class="required">*</span></label>
+                                    <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-100 Administration Building / Muster Point" required>
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                    <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 0 for Muster or 15 for Briefing" required>
+                                </div>
+                                <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
+                                <div class="form-group span-2">
+                                    <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                    <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Tour Coordinator">
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                    <textarea name="facility_notes[]" rows="2" placeholder="Badging, general site safety orientation, muster instructions..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Generate subsequent stop markup
+            function getAdditionalStopHtml(stopIndex) {
+                return `
+                    <div class="stop-card dynamic-stop" data-is-start="0" data-expanded="true">
+                        <input type="hidden" name="facility_is_start[]" value="0">
+                        <div class="stop-header">
+                            <div class="stop-header-left">
+                                <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
+                                <span class="stop-number">Stop ${stopIndex}</span>
+                                <span class="stop-header-preview">New Stop</span>
+                                <span class="stop-header-time-pill">-- min</span>
+                            </div>
+                            <div class="stop-header-actions">
+                                <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
+                                <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
+                            </div>
+                        </div>
+                        <div class="stop-body" style="display: block;">
+                            <div class="stop-grid">
+                                <div class="form-group span-2">
+                                    <label>Facility / Location Name <span class="required">*</span></label>
+                                    <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
+                                    <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30 (or 0 for drive-by)" required>
+                                </div>
+                                <div class="form-group span-2 arrival-time-group">
+                                    <label>Arrival Time <span class="arrival-required-star required" style="display: none;">*</span></label>
+                                    <input type="time" name="facility_arrival_times[]" class="facility-arrival-input">
+                                    <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Required if duration is greater than 0 minutes. If 0 minutes, arrival time is optional.</small>
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Subject Matter Expert (SME) at Stop (Optional)</label>
+                                    <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Operations Engineer">
+                                </div>
+                                <div class="form-group span-2">
+                                    <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
+                                    <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // --- 2. Clear Stops: Resets to default blank Start stop ---
             if (clearStopsBtn) {
                 clearStopsBtn.addEventListener('click', function() {
                     const stopsList = document.getElementById('stopsList');
                     if (stopsList) {
-                        stopsList.innerHTML = `
-                            <div class="stop-card dynamic-stop" data-expanded="false">
-                                <div class="stop-header">
-                                    <div class="stop-header-left">
-                                        <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
-                                        <span class="stop-number">Stop 1</span>
-                                        <span class="stop-header-preview">New Stop</span>
-                                        <span class="stop-header-time-pill">-- min</span>
-                                    </div>
-                                    <div class="stop-header-actions">
-                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
-                                        <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
-                                        <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
-                                    </div>
-                                </div>
-                                <div class="stop-body">
-                                    <div class="stop-grid">
-                                        <div class="form-group span-2">
-                                            <label>Facility / Location Name <span class="required">*</span></label>
-                                            <input type="text" name="facility_names[]" class="facility-name-input" placeholder="e.g., C-300 Central Control Facility" required>
-                                        </div>
-                                        <div class="form-group span-2">
-                                            <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 30">
-                                        </div>
-                                        <div class="form-group span-2">
-                                            <label>Subject Matter Expert (SME) at Stop (Optional)</label>
-                                            <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Senior Operations Engineer">
-                                        </div>
-                                        <div class="form-group span-2">
-                                            <label>Stop Agenda / Briefing Focus / Safety Requirements</label>
-                                            <textarea name="facility_notes[]" rows="2" placeholder="Key topics covered, PPE required, or specific route instructions..."></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                        stopsList.innerHTML = getDefaultStartStopHtml();
+                        reindexStops();
                         updateTimeBudget();
                     }
+                });
+            }
+
+            // --- 3. Add Stop Support ---
+            if (addStopBtn) {
+                addStopBtn.addEventListener('click', function(e) {
+                    const stopsList = document.getElementById('stopsList');
+                    if (!stopsList) return;
+                    const count = stopsList.querySelectorAll('.stop-card').length;
+                    const temp = document.createElement('div');
+                    temp.innerHTML = getAdditionalStopHtml(count + 1).trim();
+                    const newCard = temp.firstElementChild;
+                    stopsList.appendChild(newCard);
+                    reindexStops();
+                    updateTimeBudget();
+
+                    newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    const input = newCard.querySelector('.facility-name-input');
+                    if (input) setTimeout(() => input.focus(), 150);
                 });
             }
 
@@ -766,14 +941,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 if (e.target.matches('#time_start, #time_end, .facility-minutes-input')) {
                     updateTimeBudget();
                 }
+                if (e.target.matches('.facility-minutes-input')) {
+                    const card = e.target.closest('.stop-card');
+                    if (card) {
+                        syncStopFieldValidation(card);
+                        const pill = card.querySelector('.stop-header-time-pill');
+                        const v = parseInt(e.target.value.trim(), 10);
+                        if (pill) pill.textContent = (!isNaN(v) && v >= 0) ? `${v} min` : '-- min';
+                    }
+                }
+                if (e.target.matches('.facility-name-input')) {
+                    const card = e.target.closest('.stop-card');
+                    if (card) {
+                        const preview = card.querySelector('.stop-header-preview');
+                        const isStart = card.getAttribute('data-is-start') === '1';
+                        if (preview) preview.textContent = e.target.value.trim() || (isStart ? 'Start Location (Required)' : 'New Stop');
+                    }
+                }
             });
-            setTimeout(updateTimeBudget, 200);
 
-            // --- 3. Missing Duration Modal Validation Logic ---
+            // --- 4. Itinerary Validation & Missing Details Interceptor ---
             function checkOtherRequiredFields() {
-                document.querySelectorAll('.facility-minutes-input').forEach(el => el.removeAttribute('required'));
-
-                const requiredInputs = form.querySelectorAll('input[required]:not(.facility-minutes-input), select[required], textarea[required]');
+                const requiredInputs = form.querySelectorAll('input[required]:not(.facility-minutes-input):not(.facility-arrival-input), select[required], textarea[required]');
                 for (let input of requiredInputs) {
                     if (!input.checkValidity() || !input.value.trim()) {
                         return false;
@@ -782,48 +971,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 return true;
             }
 
-            function getStopsWithoutDuration() {
+            function getStopsWithMissingDetails() {
                 const stopCards = document.querySelectorAll('#stopsList .stop-card');
-                const missing = [];
+                const issues = [];
 
                 stopCards.forEach((card, index) => {
+                    const isStart = card.getAttribute('data-is-start') === '1';
                     const nameInput = card.querySelector('.facility-name-input');
                     const minsInput = card.querySelector('.facility-minutes-input');
+                    const arrivalInput = card.querySelector('.facility-arrival-input');
                     const stopNum = index + 1;
-                    const stopName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : `Stop ${stopNum}`;
+                    const stopLabel = isStart ? 'Start Location' : `Stop ${stopNum}`;
 
-                    const rawVal = minsInput ? minsInput.value.trim() : '';
-                    const parsed = parseInt(rawVal, 10);
+                    const nameVal = nameInput ? nameInput.value.trim() : '';
+                    const rawMins = minsInput ? minsInput.value.trim() : '';
+                    const parsedMins = parseInt(rawMins, 10);
+                    const arrivalVal = arrivalInput ? arrivalInput.value.trim() : '';
 
-                    if (!rawVal || isNaN(parsed) || parsed <= 0) {
-                        missing.push({
+                    let errorReason = '';
+                    let targetInput = null;
+
+                    if (!nameVal) {
+                        errorReason = 'Location name required';
+                        targetInput = nameInput;
+                    } else if (rawMins === '' || isNaN(parsedMins) || parsedMins < 0) {
+                        errorReason = 'Duration needed (0 or more mins)';
+                        targetInput = minsInput;
+                    } else if (!isStart && parsedMins > 0 && !arrivalVal) {
+                        errorReason = 'Arrival time required (duration > 0)';
+                        targetInput = arrivalInput;
+                    }
+
+                    if (errorReason) {
+                        issues.push({
                             card: card,
                             stopNum: stopNum,
-                            name: stopName,
-                            minsInput: minsInput
+                            isStart: isStart,
+                            name: nameVal || stopLabel,
+                            errorReason: errorReason,
+                            targetInput: targetInput
                         });
                     }
                 });
 
-                return missing;
+                return issues;
             }
 
-            function showModal(missingStops) {
-                currentMissingStops = missingStops;
+            function showModal(issues) {
+                currentMissingStops = issues;
                 if (!modal || !modalList) return;
 
                 modalList.innerHTML = '';
-                missingStops.forEach(item => {
+                issues.forEach(item => {
                     const li = document.createElement('li');
                     li.className = 'modal-stop-item';
                     li.innerHTML = `
                         <div>
-                            <span class="modal-stop-badge">Stop ${item.stopNum}</span>
+                            <span class="modal-stop-badge">${escapeHtml(item.isStart ? 'Start' : 'Stop ' + item.stopNum)}</span>
                             <strong>${escapeHtml(item.name)}</strong>
                         </div>
                         <span class="modal-stop-needed">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                            Duration needed
+                            ${escapeHtml(item.errorReason)}
                         </span>
                     `;
                     modalList.appendChild(li);
@@ -836,9 +1045,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 if (modal) modal.style.display = 'none';
             }
 
-            if (modalDismissBtn) {
-                modalDismissBtn.addEventListener('click', hideModal);
-            }
+            if (modalDismissBtn) modalDismissBtn.addEventListener('click', hideModal);
 
             if (modalFixBtn) {
                 modalFixBtn.addEventListener('click', function() {
@@ -853,20 +1060,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                         const toggleBtn = item.card.querySelector('.btn-toggle-collapse');
                         if (toggleBtn) toggleBtn.innerHTML = '&#9652;';
 
-                        if (item.minsInput) {
-                            item.minsInput.classList.add('input-error-highlight');
-                            item.minsInput.addEventListener('input', function() {
-                                item.minsInput.classList.remove('input-error-highlight');
+                        if (item.targetInput) {
+                            item.targetInput.classList.add('input-error-highlight');
+                            item.targetInput.addEventListener('input', function() {
+                                item.targetInput.classList.remove('input-error-highlight');
                             }, { once: true });
                         }
                     });
 
                     const first = currentMissingStops[0];
-                    if (first && first.minsInput) {
-                        first.minsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        setTimeout(() => {
-                            first.minsInput.focus();
-                        }, 250);
+                    if (first && first.targetInput) {
+                        first.targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => first.targetInput.focus(), 250);
                     }
                 });
             }
@@ -882,7 +1087,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 });
             }
 
-            // --- 4. Map Route & Extent Synchronization ---
+            // --- 5. Map Route & Extent Synchronization ---
             const initialSavedRoute = (routeInput?.value || '').trim();
             const isEditMode = initialSavedRoute.startsWith('data:image/');
             let userModifiedCanvas = false;
@@ -898,7 +1103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             function applyRestoredState() {
                 if (!savedState) return;
 
-                // 1. Restore routeLegs
                 if (Array.isArray(savedState.routeLegs) && savedState.routeLegs.length > 0) {
                     if (Array.isArray(window.routeLegs)) {
                         window.routeLegs.length = 0;
@@ -908,7 +1112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     }
                 }
 
-                // 2. Restore tourStops
                 if (Array.isArray(savedState.tourStops) && savedState.tourStops.length > 0) {
                     if (Array.isArray(window.tourStops)) {
                         window.tourStops.length = 0;
@@ -918,7 +1121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     }
                 }
 
-                // 3. Restore viewport transform
                 if (savedState.scale) {
                     window.scale = savedState.scale;
                     if (window.viewState) window.viewState.scale = savedState.scale;
@@ -940,7 +1142,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     if (badge) badge.textContent = savedState.zoomPercent + '%';
                 }
 
-                // 4. Trigger redraw in app.js
                 if (typeof window.restoreMapEngineState === 'function') {
                     window.restoreMapEngineState(savedState);
                 } else if (typeof window.redrawCanvas === 'function') {
@@ -949,14 +1150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     window.renderMap();
                 } else if (typeof window.redraw === 'function') {
                     window.redraw();
-                } else if (typeof window.render === 'function') {
-                    window.render();
-                } else if (typeof window.draw === 'function') {
-                    window.draw();
                 }
             }
 
-            // Fallback for legacy records that only have a flat snapshot and no vector legs saved
             let savedMapImageObj = null;
             if (isEditMode && (!savedState || !savedState.routeLegs || savedState.routeLegs.length === 0)) {
                 savedMapImageObj = new Image();
@@ -974,17 +1170,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 savedMapImageObj.onload = renderSavedMapToCanvas;
                 setTimeout(renderSavedMapToCanvas, 250);
                 setTimeout(renderSavedMapToCanvas, 600);
-                setTimeout(renderSavedMapToCanvas, 1200);
             }
 
-            // Restore state across initial load and asynchronous GIS layer load completions
             applyRestoredState();
-            window.addEventListener('load', () => setTimeout(applyRestoredState, 150));
-            setTimeout(applyRestoredState, 350);
-            setTimeout(applyRestoredState, 700);
-            setTimeout(applyRestoredState, 1200);
+            window.addEventListener('load', () => {
+                setTimeout(applyRestoredState, 150);
+                reindexStops();
+                updateTimeBudget();
+            });
 
-            // Track any user interaction that alters the route or view
             if (canvas) {
                 ['mousedown', 'touchstart', 'pointerdown', 'wheel'].forEach(evt => {
                     canvas.addEventListener(evt, () => {
@@ -1071,25 +1265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             }
             window.syncCurrentMapExtent = syncCurrentMapExtent;
 
-            // Block conflicting scripts from resetting view extents during submission
-            if (typeof window.zoomReset === 'function') {
-                const origZoomReset = window.zoomReset;
-                window.zoomReset = function() {
-                    if (isSubmitting) return;
-                    return origZoomReset.apply(this, arguments);
-                };
-            }
-            if (typeof window.resetView === 'function') {
-                const origResetView = window.resetView;
-                window.resetView = function() {
-                    if (isSubmitting) return;
-                    return origResetView.apply(this, arguments);
-                };
-            }
-
             function validateAndIntercept(e) {
-                document.querySelectorAll('.facility-minutes-input').forEach(el => el.removeAttribute('required'));
-
                 const othersValid = checkOtherRequiredFields();
                 if (!othersValid) {
                     if (typeof form.reportValidity === 'function') {
@@ -1102,7 +1278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     return false;
                 }
 
-                const missing = getStopsWithoutDuration();
+                const missing = getStopsWithMissingDetails();
                 if (missing.length > 0) {
                     if (e) {
                         e.preventDefault();
