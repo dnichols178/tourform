@@ -186,6 +186,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const alertTotalMins = document.getElementById('alertTotalMins');
     const alertOverMins = document.getElementById('alertOverMins');
 
+    // Centralized Helper to toggle card expanded/collapsed state cleanly
+    function setStopCardExpanded(stopCard, expand) {
+        if (!stopCard) return;
+        stopCard.setAttribute('data-expanded', expand ? 'true' : 'false');
+        const body = stopCard.querySelector('.stop-body');
+        if (body) {
+            body.style.display = expand ? 'block' : 'none';
+        }
+        const toggle = stopCard.querySelector('.btn-toggle-collapse');
+        if (toggle) {
+            toggle.innerHTML = expand ? '&#9652;' : '&#9662;';
+        }
+    }
+
     // Helper: Couple duration to arrival time requirement
     function updateCardArrivalRequirement(stopCard) {
         if (!stopCard) return;
@@ -207,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Create a new Stop Card (Expanded by default when added)
+    // Create a new Stop Card (Collapsed by default, only Start is expanded)
     function addFacilityStop(prefillName = '') {
         if (!stopsList) return null;
         const currentCount = stopsList.querySelectorAll('.dynamic-stop').length + 1;
@@ -216,12 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const stopDiv = document.createElement('div');
         stopDiv.className = 'stop-card dynamic-stop';
         stopDiv.setAttribute('data-is-start', '0');
-        stopDiv.setAttribute('data-expanded', 'true');
+        stopDiv.setAttribute('data-expanded', 'false');
         stopDiv.innerHTML = `
             <input type="hidden" name="facility_is_start[]" value="0">
             <div class="stop-header">
                 <div class="stop-header-left">
-                    <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9652;</button>
+                    <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
                     <span class="stop-number">Stop ${currentCount}</span>
                     <span class="stop-header-preview">${displayName}</span>
                     <span class="stop-header-time-pill">-- min</span>
@@ -232,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
                 </div>
             </div>
-            <div class="stop-body" style="display: block;">
+            <div class="stop-body" style="display: none;">
                 <div class="stop-grid">
                     <div class="form-group span-2">
                         <label>Facility / Location Name <span class="required">*</span></label>
@@ -264,11 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
         recalculateTimeBudget();
 
         stopDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        const nameInput = stopDiv.querySelector('.facility-name-input');
-        if (nameInput) {
-            setTimeout(() => nameInput.focus(), 150);
-        }
-
         return stopDiv;
     }
 
@@ -283,15 +292,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Collapse All Handler
     if (collapseAllBtn) {
-        collapseAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'false'));
+        collapseAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.dynamic-stop').forEach(card => setStopCardExpanded(card, false));
         });
     }
 
+    // Expand All Handler
     if (expandAllBtn) {
-        expandAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.dynamic-stop').forEach(card => card.setAttribute('data-expanded', 'true'));
+        expandAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.dynamic-stop').forEach(card => setStopCardExpanded(card, true));
         });
     }
 
@@ -304,11 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle Collapse on Header Click
             if (e.target.closest('.stop-header') && !e.target.closest('.btn-reorder') && !e.target.closest('.btn-remove-stop')) {
                 const isExpanded = stopCard.getAttribute('data-expanded') === 'true';
-                stopCard.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
-                const body = stopCard.querySelector('.stop-body');
-                if (body) body.style.display = isExpanded ? 'none' : 'block';
-                const toggle = stopCard.querySelector('.btn-toggle-collapse');
-                if (toggle) toggle.innerHTML = isExpanded ? '&#9662;' : '&#9652;';
+                setStopCardExpanded(stopCard, !isExpanded);
                 return;
             }
 
@@ -1049,7 +1058,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
 
                     // ISOLATE START LOCATION: Never populate the default Start Location from map clicks.
-                    // Filter to non-start cards only:
                     const nonStartCards = Array.from(document.querySelectorAll('.dynamic-stop')).filter(card => card.getAttribute('data-is-start') !== '1');
                     const emptyNonStart = nonStartCards.map(c => c.querySelector('.facility-name-input')).find(inp => inp && inp.value.trim() === '');
 
@@ -1256,7 +1264,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentMode === 'stop' && stopsMarkers.length > 0) {
             stopsMarkers.pop();
             const stopCards = stopsList ? stopsList.querySelectorAll('.dynamic-stop') : [];
-            // Never remove or alter the initial Start stop card on map undo
             if (stopCards.length > 1) {
                 stopCards[stopCards.length - 1].remove();
                 renumberStops();
