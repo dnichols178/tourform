@@ -273,6 +273,12 @@ foreach ($rawStops as $idx => $s) {
     $isStart = ($idx === 0) || !empty($s['is_start']);
     $arrivalTime = trim((string)($s['arrival_time'] ?? ''));
 
+    // If this is the default Start location and no arrival time was explicitly provided,
+    // default to the tour's scheduled start time ($timeStart)
+    if ($isStart && $arrivalTime === '' && !empty($timeStart)) {
+        $arrivalTime = $timeStart;
+    }
+
     // 1. Arrival Time column: 9:30 AM format, or N/A if not listed
     $arrivalDisplay = 'N/A';
     if ($arrivalTime !== '') {
