@@ -169,6 +169,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -------------------------------------------------------------
+    // Itinerary Time Math Helpers
+    // -------------------------------------------------------------
+    function timeStringToMinutes(timeStr) {
+        if (!timeStr) return null;
+        const parts = timeStr.trim().split(':');
+        if (parts.length < 2) return null;
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return (h * 60) + m;
+    }
+
+    function minutesToTimeString(totalMinutes) {
+        if (totalMinutes === null || isNaN(totalMinutes)) return '';
+        const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+        const h = Math.floor(normalized / 60);
+        const m = normalized % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function minutesTo12HourDisplay(totalMinutes) {
+        if (totalMinutes === null || isNaN(totalMinutes)) return '--';
+        const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+        let h = Math.floor(normalized / 60);
+        const m = normalized % 60;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+
+    // -------------------------------------------------------------
     // Collapsible & Reorderable Stops Engine
     // -------------------------------------------------------------
     const stopsList = document.getElementById('stopsList');
@@ -200,6 +231,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Calculates and displays Arrival, Duration, and Departure for an individual stop card
+    function calculateStopTimes(stopCard) {
+        if (!stopCard) return { arrival: null, duration: 0, departure: null };
+        const isStart = stopCard.getAttribute('data-is-start') === '1';
+        const arrivalInput = stopCard.querySelector('.facility-arrival-input');
+        const minutesInput = stopCard.querySelector('.facility-minutes-input');
+
+        let arrivalMins = null;
+        if (isStart) {
+            if (timeStartInput && timeStartInput.value) {
+                if (arrivalInput && (!arrivalInput.value || arrivalInput.value !== timeStartInput.value)) {
+                    arrivalInput.value = timeStartInput.value;
+                }
+            }
+            const currentVal = arrivalInput ? arrivalInput.value : (timeStartInput ? timeStartInput.value : '');
+            arrivalMins = timeStringToMinutes(currentVal);
+        } else {
+            arrivalMins = arrivalInput ? timeStringToMinutes(arrivalInput.value) : null;
+        }
+
+        let durationMins = 0;
+        if (isStart) {
+            durationMins = 0;
+            if (minutesInput) {
+                minutesInput.value = '0';
+                minutesInput.readOnly = true;
+            }
+        } else {
+            durationMins = minutesInput ? parseInt(minutesInput.value, 10) : 0;
+            if (isNaN(durationMins) || durationMins < 0) durationMins = 0;
+        }
+
+        let departureMins = null;
+        if (arrivalMins !== null) {
+            departureMins = arrivalMins + durationMins;
+        }
+
+        const depDisplay = stopCard.querySelector('.calculated-departure-text');
+        if (depDisplay) {
+            depDisplay.textContent = departureMins !== null ? minutesTo12HourDisplay(departureMins) : '--';
+        }
+
+        const timePill = stopCard.querySelector('.stop-header-time-pill');
+        if (timePill) {
+            if (isStart) {
+                timePill.textContent = '0 min (Tour Start)';
+            } else {
+                timePill.textContent = `${durationMins} min`;
+            }
+        }
+
+        return { arrival: arrivalMins, duration: durationMins, departure: departureMins };
+    }
+
     // Helper: Couple duration to arrival time requirement
     function updateCardArrivalRequirement(stopCard) {
         if (!stopCard) return;
@@ -208,7 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const arrivalInput = stopCard.querySelector('.facility-arrival-input');
         const star = stopCard.querySelector('.arrival-required-star');
 
-        if (isStart || !arrivalInput) return;
+        if (isStart) {
+            if (arrivalInput) arrivalInput.required = true;
+            if (star) star.style.display = 'inline';
+            return;
+        }
+
+        if (!arrivalInput) return;
 
         const val = minsInput ? parseInt(minsInput.value.trim(), 10) : 0;
         if (!isNaN(val) && val > 0) {
@@ -221,11 +312,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Retrieves departure time of the preceding stop to set default arrival on new stop
+    function getLastStopDepartureMinutes() {
+        if (!stopsList) return null;
+        const allStops = stopsList.querySelectorAll('.dynamic-stop');
+        if (allStops.length === 0) {
+            return timeStartInput ? timeStringToMinutes(timeStartInput.value) : null;
+        }
+        const lastCard = allStops[allStops.length - 1];
+        const times = calculateStopTimes(lastCard);
+        if (times.departure !== null) {
+            return times.departure;
+        }
+        return timeStartInput ? timeStringToMinutes(timeStartInput.value) : null;
+    }
+
+    // Synchronize Stop 1 (Start location) with the main Tour Start Time input
+    function syncStartStopWithTourStartTime() {
+        if (!stopsList) return;
+        const startCard = stopsList.querySelector('.dynamic-stop[data-is-start="1"]');
+        if (!startCard) return;
+
+        const arrivalInput = startCard.querySelector('.facility-arrival-input');
+        if (arrivalInput && timeStartInput && timeStartInput.value) {
+            arrivalInput.value = timeStartInput.value;
+        }
+        const minsInput = startCard.querySelector('.facility-minutes-input');
+        if (minsInput) {
+            minsInput.value = '0';
+            minsInput.readOnly = true;
+        }
+        calculateStopTimes(startCard);
+    }
+
     // Create a new Stop Card (Collapsed by default, only Start is expanded)
     function addFacilityStop(prefillName = '') {
         if (!stopsList) return null;
         const currentCount = stopsList.querySelectorAll('.dynamic-stop').length + 1;
         const displayName = prefillName || 'New Stop';
+
+        // Compute chained default arrival time based on previous stop's departure
+        const defaultDepMins = getLastStopDepartureMinutes();
+        const defaultArrivalStr = defaultDepMins !== null ? minutesToTimeString(defaultDepMins) : '';
 
         const stopDiv = document.createElement('div');
         stopDiv.className = 'stop-card dynamic-stop';
@@ -258,8 +386,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="form-group span-2 arrival-time-group">
                         <label>Arrival Time <span class="arrival-required-star required" style="display: none;">*</span></label>
-                        <input type="time" name="facility_arrival_times[]" class="facility-arrival-input">
-                        <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Required if duration is greater than 0 minutes. If 0 minutes, arrival time is optional.</small>
+                        <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="${defaultArrivalStr}">
+                        <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
+                            Departure: <strong class="calculated-departure-text">--</strong>
+                        </small>
                     </div>
                     <div class="form-group span-2">
                         <label>Subject Matter Expert (SME) at Stop (Optional)</label>
@@ -275,6 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         stopsList.appendChild(stopDiv);
         renumberStops();
+        calculateStopTimes(stopDiv);
         recalculateTimeBudget();
 
         stopDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -365,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Sync Live Header Summary as user types & couple Arrival Time
+        // Sync Live Header Summary, Arrival Requirements & Live Departure Math as user types
         stopsList.addEventListener('input', (e) => {
             const stopCard = e.target.closest('.dynamic-stop');
             if (!stopCard) return;
@@ -378,20 +509,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            if (e.target.classList.contains('facility-minutes-input')) {
-                const timePill = stopCard.querySelector('.stop-header-time-pill');
-                if (timePill) {
-                    const rawVal = e.target.value.trim();
-                    const val = parseInt(rawVal, 10);
-                    timePill.textContent = (rawVal !== '' && !isNaN(val) && val >= 0) ? `${val} min` : '-- min';
-                }
+            if (e.target.classList.contains('facility-minutes-input') || e.target.classList.contains('facility-arrival-input')) {
+                calculateStopTimes(stopCard);
                 updateCardArrivalRequirement(stopCard);
                 recalculateTimeBudget();
             }
         });
     }
 
-    // Renumber Stops Chronologically & Enforce Start Stop State
+    // Renumber Stops Chronologically & Enforce Start Stop Anchor State
     function renumberStops() {
         if (!stopsList) return;
         const stopCards = stopsList.querySelectorAll('.dynamic-stop');
@@ -408,6 +534,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const label = card.querySelector('.stop-number');
             const preview = card.querySelector('.stop-header-preview');
             const nameInput = card.querySelector('.facility-name-input');
+            const minutesInput = card.querySelector('.facility-minutes-input');
+            const arrivalInput = card.querySelector('.facility-arrival-input');
             const removeBtn = card.querySelector('.btn-remove-stop');
             let startBadge = card.querySelector('.badge-start-stop');
 
@@ -425,15 +553,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (label) label.textContent = 'Start Location';
                 if (preview) preview.textContent = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Start Location (Required)';
                 if (removeBtn) removeBtn.style.display = 'none';
+
+                if (minutesInput) {
+                    minutesInput.value = '0';
+                    minutesInput.readOnly = true;
+                }
+                if (arrivalInput && timeStartInput && timeStartInput.value && !arrivalInput.value) {
+                    arrivalInput.value = timeStartInput.value;
+                }
             } else {
                 card.classList.remove('is-start-stop');
                 if (startBadge) startBadge.remove();
                 if (label) label.textContent = `Stop ${index + 1}`;
                 if (preview) preview.textContent = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'New Stop';
                 if (removeBtn) removeBtn.style.display = 'inline-flex';
+                if (minutesInput && minutesInput.readOnly) {
+                    minutesInput.readOnly = false;
+                }
             }
 
             updateCardArrivalRequirement(card);
+            calculateStopTimes(card);
         });
     }
 
@@ -510,7 +650,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (timeStartInput) timeStartInput.addEventListener('change', recalculateTimeBudget);
+    if (timeStartInput) {
+        timeStartInput.addEventListener('change', () => {
+            syncStartStopWithTourStartTime();
+            recalculateTimeBudget();
+        });
+        timeStartInput.addEventListener('input', () => {
+            syncStartStopWithTourStartTime();
+            recalculateTimeBudget();
+        });
+    }
     if (timeEndInput) timeEndInput.addEventListener('change', recalculateTimeBudget);
 
     // -------------------------------------------------------------
@@ -1310,6 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (clearStopsBtn) {
         clearStopsBtn.addEventListener('click', () => {
             stopsMarkers = [];
+            const startTimeVal = timeStartInput ? timeStartInput.value : '';
             if (stopsList) {
                 stopsList.innerHTML = `
                     <div class="stop-card dynamic-stop is-start-stop" data-is-start="1" data-expanded="true">
@@ -1320,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="badge-start-stop">Start</span>
                                 <span class="stop-number">Start Location</span>
                                 <span class="stop-header-preview">Start Location (Required)</span>
-                                <span class="stop-header-time-pill">-- min</span>
+                                <span class="stop-header-time-pill">0 min (Tour Start)</span>
                             </div>
                             <div class="stop-header-actions">
                                 <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
@@ -1335,9 +1485,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="form-group span-2">
                                     <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                    <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 0 for Muster or 15 for Briefing" required>
+                                    <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" value="0" readonly placeholder="0 (Start Location)" required>
                                 </div>
-                                <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
+                                <div class="form-group span-2 arrival-time-group">
+                                    <label>Arrival / Start Time <span class="arrival-required-star required">*</span></label>
+                                    <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="${startTimeVal}">
+                                    <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
+                                        Departure: <strong class="calculated-departure-text">--</strong>
+                                    </small>
+                                </div>
                                 <div class="form-group span-2">
                                     <label>Subject Matter Expert (SME) at Stop (Optional)</label>
                                     <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Tour Coordinator">
@@ -1441,5 +1597,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial setup
     setMode('pan');
     renumberStops();
+    syncStartStopWithTourStartTime();
     recalculateTimeBudget();
 });
