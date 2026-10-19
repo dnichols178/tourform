@@ -530,13 +530,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                         <?php if (!empty($stops)): ?>
                             <?php foreach ($stops as $idx => $s): 
                                 $isStart = ($idx === 0) || !empty($s['is_start']);
-                                $sNum    = $idx + 1;
+                                $sNum    =$idx + 1;
                                 $sName   = clean($s['name'] ?? '');
-                                $sMins   = isset($s['minutes']) && $s['minutes'] !== '' ? (int)$s['minutes'] : '';
-                                $sSme    = clean($s['sme'] ?? '');
-                                $sNotes  = clean($s['notes'] ?? '');
-                                $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
-                                $isExpanded = $isStart; // Start location expanded by default, all others collapsed
+                                $sMins   =$isStart ? 0 : (isset($s['minutes']) &&$s['minutes'] !== '' ? (int)$s['minutes'] : '');$sSme    = clean($s['sme'] ?? '');$sNotes  = clean($s['notes'] ?? '');$sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
+                                if ($isStart && empty($sArrival)) {
+                                    $sArrival =$timeStart;
+                                }
+                                $isExpanded =$isStart; // Start location expanded by default, all others collapsed
                             ?>
                                 <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="<?= $isExpanded ? 'true' : 'false' ?>">
                                     <input type="hidden" name="facility_is_start[]" value="<?= $isStart ? '1' : '0' ?>">
@@ -550,7 +550,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                                 <span class="stop-number">Stop <?= $sNum ?></span>
                                             <?php endif; ?>
                                             <span class="stop-header-preview"><?= $sName ?: ($isStart ? 'Start Location (Required)' : 'New Stop') ?></span>
-                                            <span class="stop-header-time-pill"><?= ($sMins !== '' && $sMins >= 0) ? $sMins . ' min' : '-- min' ?></span>
+                                            <span class="stop-header-time-pill"><?= $isStart ? '0 min (Tour Start)' : (($sMins !== '' && $sMins >= 0) ?$sMins . ' min' : '-- min') ?></span>
                                         </div>
                                         <div class="stop-header-actions">
                                             <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
@@ -568,17 +568,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             </div>
                                             <div class="form-group span-2">
                                                 <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= ($sMins !== '' && $sMins >= 0) ? $sMins : '' ?>" min="0" max="1440" placeholder="e.g., 0 for Muster/Briefing or 30" required>
+                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $isStart ? 0 : (($sMins !== '' && $sMins >= 0) ?$sMins : '') ?>" min="0" max="1440" <?= $isStart ? 'readonly' : '' ?> placeholder="<?= $isStart ? '0 (Start Location)' : 'e.g., 30 (or 0 for drive-by)' ?>" required>
                                             </div>
-                                            <?php if (!$isStart): ?>
-                                                <div class="form-group span-2 arrival-time-group">
-                                                    <label>Arrival Time <span class="arrival-required-star required" style="<?= ($sMins !== '' && (int)$sMins > 0) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
-                                                    <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= $sArrival ?>" <?= ($sMins !== '' && (int)$sMins > 0) ? 'required' : '' ?>>
-                                                    <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Required if duration is greater than 0 minutes. If 0 minutes, arrival time is optional.</small>
-                                                </div>
-                                            <?php else: ?>
-                                                <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
-                                            <?php endif; ?>
+                                            <div class="form-group span-2 arrival-time-group">
+                                                <label><?= $isStart ? 'Arrival / Start Time' : 'Arrival Time' ?> <span class="arrival-required-star required" style="<?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
+                                                <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= $sArrival ?>" <?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'required' : '' ?>>
+                                                <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
+                                                    Departure: <strong class="calculated-departure-text">--</strong>
+                                                </small>
+                                            </div>
                                             <div class="form-group span-2">
                                                 <label>Subject Matter Expert (SME) at Stop (Optional)</label>
                                                 <input type="text" name="facility_smes[]" value="<?= $sSme ?>" placeholder="e.g., Jane Smith, Senior Operations Engineer">
@@ -601,7 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                         <span class="badge-start-stop">Start</span>
                                         <span class="stop-number">Start Location</span>
                                         <span class="stop-header-preview">Start Location (Required)</span>
-                                        <span class="stop-header-time-pill">-- min</span>
+                                        <span class="stop-header-time-pill">0 min (Tour Start)</span>
                                     </div>
                                     <div class="stop-header-actions">
                                         <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
@@ -616,9 +614,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                         </div>
                                         <div class="form-group span-2">
                                             <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" placeholder="e.g., 0 for Muster or 15 for Briefing" required>
+                                            <input type="number" name="facility_minutes[]" class="facility-minutes-input" min="0" max="1440" value="0" readonly placeholder="0 (Start Location)" required>
                                         </div>
-                                        <input type="hidden" name="facility_arrival_times[]" class="facility-arrival-input" value="">
+                                        <div class="form-group span-2 arrival-time-group">
+                                            <label>Arrival / Start Time <span class="arrival-required-star required">*</span></label>
+                                            <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= clean($timeStart) ?>" required>
+                                            <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
+                                                Departure: <strong class="calculated-departure-text">--</strong>
+                                            </small>
+                                        </div>
                                         <div class="form-group span-2">
                                             <label>Subject Matter Expert (SME) at Stop (Optional)</label>
                                             <input type="text" name="facility_smes[]" placeholder="e.g., Jane Smith, Tour Coordinator">
@@ -748,6 +752,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                     } else if (rawMins === '' || isNaN(parsedMins) || parsedMins < 0) {
                         errorReason = 'Duration needed (0 or more mins)';
                         targetInput = minsInput;
+                    } else if (isStart && !arrivalVal) {
+                        errorReason = 'Tour start time required';
+                        targetInput = arrivalInput;
                     } else if (!isStart && parsedMins > 0 && !arrivalVal) {
                         errorReason = 'Arrival time required (duration > 0)';
                         targetInput = arrivalInput;
