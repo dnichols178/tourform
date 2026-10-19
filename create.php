@@ -500,7 +500,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 <div class="card-header flex-between">
                     <div>
                         <h2>4. Facility Stops & Itinerary Times</h2>
-                        <p class="section-desc">Reorder stops using buttons. Each card can collapse or expand for easier management.</p>
+                        <p class="section-desc">Reorder stops using buttons. Timings will automatically cascade to eliminate overlaps.</p>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" class="btn btn-secondary btn-sm" id="collapseAllBtn">Collapse All</button>
@@ -536,13 +536,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                 $sSme    = clean($s['sme'] ?? '');
                                 $sNotes  = clean($s['notes'] ?? '');
                                 
-                                // Start location always defaults to time_start
-                                if ($isStart) {$sArrival = !empty($timeStart) ? clean($timeStart) : clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
+                                // Start location arrival always anchors to timeStart
+                                if ($isStart) {
+                                    $sArrival = !empty($timeStart) ? clean($timeStart) : clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
                                 } else {
                                     $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
                                 }
                                 
-                                $isExpanded =$isStart; // Start location expanded by default, all others collapsed
+                                $isExpanded = $isStart; // Start location expanded by default, all others collapsed
                             ?>
                                 <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="<?= $isExpanded ? 'true' : 'false' ?>">
                                     <input type="hidden" name="facility_is_start[]" value="<?= $isStart ? '1' : '0' ?>">
@@ -556,11 +557,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                                 <span class="stop-number">Stop <?= $sNum ?></span>
                                             <?php endif; ?>
                                             <span class="stop-header-preview"><?= $sName ?: ($isStart ? 'Start Location (Required)' : 'New Stop') ?></span>
-                                            <span class="stop-header-time-pill"><?= $isStart ? '0 min (Tour Start)' : (($sMins !== '' && $sMins >= 0) ?$sMins . ' min' : '-- min') ?></span>
+                                            <span class="stop-header-time-pill"><?= $isStart ? '0 min (Tour Start)' : (($sMins !== '' && $sMins >= 0) ? $sMins . ' min' : '-- min') ?></span>
                                         </div>
                                         <div class="stop-header-actions">
-                                            <button type="button" class="btn-reorder btn-move-up" title="Move Up">&#9650;</button>
-                                            <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                            <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="<?= ($isStart || $idx === 1) ? 'display: none;' : '' ?>">&#9650;</button>
+                                            <button type="button" class="btn-reorder btn-move-down" title="Move Down" style="<?= ($isStart || $idx === count($stops) - 1) ? 'display: none;' : '' ?>">&#9660;</button>
                                             <?php if (!$isStart): ?>
                                                 <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
                                             <?php endif; ?>
@@ -574,7 +575,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             </div>
                                             <div class="form-group span-2">
                                                 <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $isStart ? 0 : (($sMins !== '' && $sMins >= 0) ?$sMins : '') ?>" min="0" max="1440" <?= $isStart ? 'readonly' : '' ?> placeholder="<?= $isStart ? '0 (Start Location)' : 'e.g., 30 (or 0 for drive-by)' ?>" required>
+                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $isStart ? 0 : (($sMins !== '' && $sMins >= 0) ? $sMins : '') ?>" min="0" max="1440" <?= $isStart ? 'readonly' : '' ?> placeholder="<?= $isStart ? '0 (Start Location)' : 'e.g., 30 (or 0 for drive-by)' ?>" required>
                                             </div>
                                             <div class="form-group span-2 arrival-time-group">
                                                 <label><?= $isStart ? 'Arrival / Start Time' : 'Arrival Time' ?> <span class="arrival-required-star required" style="<?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
@@ -582,6 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                                 <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
                                                     Departure: <strong class="calculated-departure-text">--</strong>
                                                 </small>
+                                                <small class="timing-conflict-warning" style="display: none; color: #dc2626; font-size: 11px; font-weight: 600; margin-top: 3px;"></small>
                                             </div>
                                             <div class="form-group span-2">
                                                 <label>Subject Matter Expert (SME) at Stop (Optional)</label>
@@ -608,8 +610,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                         <span class="stop-header-time-pill">0 min (Tour Start)</span>
                                     </div>
                                     <div class="stop-header-actions">
-                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="visibility: hidden;">&#9650;</button>
-                                        <button type="button" class="btn-reorder btn-move-down" title="Move Down">&#9660;</button>
+                                        <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="display: none;">&#9650;</button>
+                                        <button type="button" class="btn-reorder btn-move-down" title="Move Down" style="display: none;">&#9660;</button>
                                     </div>
                                 </div>
                                 <div class="stop-body" style="display: block;">
@@ -628,6 +630,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
                                                 Departure: <strong class="calculated-departure-text">--</strong>
                                             </small>
+                                            <small class="timing-conflict-warning" style="display: none; color: #dc2626; font-size: 11px; font-weight: 600; margin-top: 3px;"></small>
                                         </div>
                                         <div class="form-group span-2">
                                             <label>Subject Matter Expert (SME) at Stop (Optional)</label>
