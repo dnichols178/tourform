@@ -273,31 +273,40 @@ foreach ($rawStops as $idx => $s) {
     $isStart = ($idx === 0) || !empty($s['is_start']);
     $arrivalTime = trim((string)($s['arrival_time'] ?? ''));
 
-    // Schedule window calculation:
-    // 1. If duration is 0, prints "N/A"
-    // 2. If duration > 0 and arrival time included: Arrive at 9:30 AM, 30 minute stop / Depart at 10:00 AM
-    // 3. If duration > 0 and no arrival time: 30 minute stop
-    if ($minutes <= 0) {
-        $scheduleWindow = 'N/A';
-    } else {
+    // 1. Arrival Time column: 9:30 AM format, or N/A if not listed
+    $arrivalDisplay = 'N/A';
+    if ($arrivalTime !== '') {
+        $formattedArrival = formatTime12($arrivalTime);
+        $arrivalDisplay = $formattedArrival !== '' ? $formattedArrival : 'N/A';
+    }
+
+    // 2. Duration column: Minutes with calculated departure time suffix
+    if ($minutes > 0) {
+        $unit = ($minutes === 1) ? 'minute' : 'minutes';
         if ($arrivalTime !== '') {
-            $arrFormatted = formatTime12($arrivalTime);
             $depFormatted = calculateDepartureTime($arrivalTime, $minutes);
-            $scheduleWindow = "Arrive at {$arrFormatted}, {$minutes} minute stop / Depart at {$depFormatted}";
+            if ($depFormatted !== '') {
+                $durationDisplay = "{$minutes} {$unit} (depart at {$depFormatted})";
+            } else {
+                $durationDisplay = "{$minutes} {$unit}";
+            }
         } else {
-            $scheduleWindow = "{$minutes} minute stop";
+            $durationDisplay = "{$minutes} {$unit}";
         }
+    } else {
+        $durationDisplay = '0 minutes';
     }
 
     $stops[] = [
-        'display_num'  => $stopCounter++,
-        'name'         => $name,
-        'minutes'      => $minutes,
-        'window'       => $scheduleWindow,
-        'arrival_time' => $arrivalTime,
-        'is_start'     => $isStart,
-        'sme'          => $s['sme'] ?? '',
-        'notes'        => $s['notes'] ?? '',
+        'display_num'      => $stopCounter++,
+        'name'             => $name,
+        'minutes'          => $minutes,
+        'arrival_display'  => $arrivalDisplay,
+        'duration_display' => $durationDisplay,
+        'arrival_time'     => $arrivalTime,
+        'is_start'         => $isStart,
+        'sme'              => $s['sme'] ?? '',
+        'notes'            => $s['notes'] ?? '',
     ];
 }
 
@@ -537,16 +546,18 @@ $hasRouteMap = is_string($routeImageData) && (
                 <table class="report-table">
                     <thead>
                         <tr>
-                            <th style="width: 28%;">Schedule Window</th>
-                            <th style="width: 26%;">Location</th>
-                            <th style="width: 22%;">Subject Matter Expert (SME)</th>
-                            <th style="width: 24%;">PPE & Requirements</th>
+                            <th style="width: 14%;">Arrival Time</th>
+                            <th style="width: 25%;">Duration</th>
+                            <th style="width: 23%;">Location</th>
+                            <th style="width: 19%;">Subject Matter Expert (SME)</th>
+                            <th style="width: 19%;">PPE & Requirements</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($stops as $stop): ?>
                             <tr class="<?= !empty($stop['is_start']) ? 'highlight-start-row' : '' ?>">
-                                <td><?= clean($stop['window']) ?></td>
+                                <td><?= clean($stop['arrival_display']) ?></td>
+                                <td><?= clean($stop['duration_display']) ?></td>
                                 <td>
                                     <?php if (!empty($stop['is_start'])): ?>
                                         <span class="start-location-badge">Start</span>
