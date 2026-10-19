@@ -530,12 +530,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                         <?php if (!empty($stops)): ?>
                             <?php foreach ($stops as $idx => $s): 
                                 $isStart = ($idx === 0) || !empty($s['is_start']);
-                                $sNum    =$idx + 1;
+                                $sNum    = $idx + 1;
                                 $sName   = clean($s['name'] ?? '');
-                                $sMins   =$isStart ? 0 : (isset($s['minutes']) &&$s['minutes'] !== '' ? (int)$s['minutes'] : '');$sSme    = clean($s['sme'] ?? '');$sNotes  = clean($s['notes'] ?? '');$sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
-                                if ($isStart && empty($sArrival)) {
-                                    $sArrival =$timeStart;
+                                $sMins   = $isStart ? 0 : (isset($s['minutes']) && $s['minutes'] !== '' ? (int)$s['minutes'] : '');
+                                $sSme    = clean($s['sme'] ?? '');
+                                $sNotes  = clean($s['notes'] ?? '');
+                                
+                                // Start location always defaults to time_start
+                                if ($isStart) {$sArrival = !empty($timeStart) ? clean($timeStart) : clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
+                                } else {
+                                    $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
                                 }
+                                
                                 $isExpanded =$isStart; // Start location expanded by default, all others collapsed
                             ?>
                                 <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="<?= $isExpanded ? 'true' : 'false' ?>">
@@ -572,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             </div>
                                             <div class="form-group span-2 arrival-time-group">
                                                 <label><?= $isStart ? 'Arrival / Start Time' : 'Arrival Time' ?> <span class="arrival-required-star required" style="<?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
-                                                <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= $sArrival ?>" <?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'required' : '' ?>>
+                                                <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= $sArrival ?>" <?= $isStart ? 'readonly' : '' ?> <?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'required' : '' ?>>
                                                 <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
                                                     Departure: <strong class="calculated-departure-text">--</strong>
                                                 </small>
@@ -618,7 +624,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                         </div>
                                         <div class="form-group span-2 arrival-time-group">
                                             <label>Arrival / Start Time <span class="arrival-required-star required">*</span></label>
-                                            <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= clean($timeStart) ?>" required>
+                                            <input type="time" name="facility_arrival_times[]" class="facility-arrival-input" value="<?= clean($timeStart) ?>" readonly required>
                                             <small class="field-hint" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">
                                                 Departure: <strong class="calculated-departure-text">--</strong>
                                             </small>
@@ -694,6 +700,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             const mapStateInput = document.getElementById('map_state');
             const canvas = document.getElementById('routeCanvas');
             const btn = document.getElementById('submitTourBtn');
+            const timeStartInput = document.getElementById('time_start');
 
             // Modal elements
             const modal = document.getElementById('missingDurationModal');
@@ -715,6 +722,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 return String(text).replace(/[&<>"']/g, m => map[m]);
             }
 
+            // Sync Start Stop Arrival with time_start input
+            function syncStartStopArrival() {
+                if (!timeStartInput) return;
+                const startStopArrival = document.querySelector('#stopsList .stop-card[data-is-start="1"] .facility-arrival-input');
+                if (startStopArrival && timeStartInput.value) {
+                    startStopArrival.value = timeStartInput.value;
+                    startStopArrival.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+
+            if (timeStartInput) {
+                timeStartInput.addEventListener('input', syncStartStopArrival);
+                timeStartInput.addEventListener('change', syncStartStopArrival);
+            }
+
             // --- 1. Itinerary Validation & Missing Details Interceptor ---
             function checkOtherRequiredFields() {
                 const requiredInputs = form.querySelectorAll('input[required]:not(.facility-minutes-input):not(.facility-arrival-input), select[required], textarea[required]');
@@ -727,6 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             }
 
             function getStopsWithMissingDetails() {
+                syncStartStopArrival();
                 const stopCards = document.querySelectorAll('#stopsList .stop-card');
                 const issues = [];
 
@@ -933,6 +956,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             applyRestoredState();
             window.addEventListener('load', () => {
                 setTimeout(applyRestoredState, 150);
+                syncStartStopArrival();
             });
 
             if (canvas) {
