@@ -115,6 +115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
             vertical-align: middle;
         }
 
+        /* Collapsible Stop Card Rules */
+        .stop-card[data-expanded="false"] .stop-body {
+            display: none !important;
+        }
+        .stop-card[data-expanded="true"] .stop-body {
+            display: block !important;
+        }
+
         /* Start Stop Distinct Styling */
         .stop-card.is-start-stop {
             border-left: 4px solid #16a34a !important;
@@ -528,12 +536,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                 $sSme    = clean($s['sme'] ?? '');
                                 $sNotes  = clean($s['notes'] ?? '');
                                 $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
+                                $isExpanded = $isStart; // Start location expanded by default, all others collapsed
                             ?>
-                                <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="false">
+                                <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="<?= $isExpanded ? 'true' : 'false' ?>">
                                     <input type="hidden" name="facility_is_start[]" value="<?= $isStart ? '1' : '0' ?>">
                                     <div class="stop-header">
                                         <div class="stop-header-left">
-                                            <button type="button" class="btn-toggle-collapse" title="Collapse / Expand">&#9662;</button>
+                                            <button type="button" class="btn-toggle-collapse" title="Collapse / Expand"><?= $isExpanded ? '&#9652;' : '&#9662;' ?></button>
                                             <?php if ($isStart): ?>
                                                 <span class="badge-start-stop">Start</span>
                                                 <span class="stop-number">Start Location</span>
@@ -551,7 +560,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             <?php endif; ?>
                                         </div>
                                     </div>
-                                    <div class="stop-body">
+                                    <div class="stop-body" style="<?= $isExpanded ? 'display: block;' : 'display: none;' ?>">
                                         <div class="stop-grid">
                                             <div class="form-group span-2">
                                                 <label><?= $isStart ? 'Start Facility / Muster Location Name' : 'Facility / Location Name' ?> <span class="required">*</span></label>
@@ -583,7 +592,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                 </div>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <!-- Default Initial Start Stop (No inputs pre-filled, but required) -->
+                            <!-- Default Initial Start Stop (Expanded by default, required) -->
                             <div class="stop-card dynamic-stop is-start-stop" data-is-start="1" data-expanded="true">
                                 <input type="hidden" name="facility_is_start[]" value="1">
                                 <div class="stop-header">
@@ -673,7 +682,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
 
     <script src="assets/js/app.js"></script>
 
-    <!-- Client Script: Clear Stops, Time Budget, Exact Zoom Extent Sync, and Modal Interceptor -->
+    <!-- Client Script: Time Budget, Exact Zoom Extent Sync, and Modal Interceptor -->
     <script>
         (function() {
             const form = document.getElementById('tourForm');
