@@ -297,7 +297,7 @@ foreach ($rawStops as $idx => $s) {
         if ($arrivalTime !== '') {
             $depFormatted = calculateDepartureTime($arrivalTime, $minutes);
             if ($depFormatted !== '') {
-                $durationDisplay = "{$minutes} {$unit} (depart at {$depFormatted})";
+                $durationDisplay = "{$minutes} {$unit}";
             } else {
                 $durationDisplay = "{$minutes} {$unit}";
             }
@@ -314,6 +314,7 @@ foreach ($rawStops as $idx => $s) {
         'minutes'          => $minutes,
         'arrival_display'  => $arrivalDisplay,
         'duration_display' => $durationDisplay,
+		'depart_display'   => $depFormatted,
         'arrival_time'     => $arrivalTime,
         'is_start'         => $isStart,
         'sme'              => $s['sme'] ?? '',
@@ -559,6 +560,7 @@ $hasRouteMap = is_string($routeImageData) && (
                         <tr>
                             <th style="width: 14%;">Arrival Time</th>
                             <th style="width: 14%;">Duration</th>
+							<th style="width: 14%;">Departure</th>
                             <th style="width: 25%;">Location</th>
                             <th style="width: 19%;">Subject Matter Expert (SME)</th>
                             <th style="width: 19%;">PPE & Requirements</th>
@@ -569,6 +571,7 @@ $hasRouteMap = is_string($routeImageData) && (
                             <tr class="<?= !empty($stop['is_start']) ? 'highlight-start-row' : '' ?>">
                                 <td><?= clean($stop['arrival_display']) ?></td>
                                 <td><?= clean($stop['duration_display']) ?></td>
+								<td><?= clean($stop['depart_display']) ?></td>
                                 <td>
                                     <!--<?php if (!empty($stop['is_start'])): ?>
                                         <span class="start-location-badge">Start</span>
