@@ -20,7 +20,7 @@ $coordinatorName = '';
 $coordinatorPhone = '';
 $coordinatorEmail = '';
 $generalNotes = '';
-$isSecuredArea = false;
+$isLimitedArea = false;
 $showArrows = true;
 $leaders = [];
 $participants = [];
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 $coordinatorPhone = (string)($record['coordinator_phone'] ?? '');
                 $coordinatorEmail = (string)($record['coordinator_email'] ?? '');
                 $generalNotes     = (string)($record['general_notes'] ?? '');
-                $isSecuredArea    = !empty($record['is_secured_area']);
+                $isLimitedArea    = !empty($record['is_limited_area']);
                 $showArrows       = !empty($record['show_arrows']);
                 $leaders          = is_array($record['leaders'] ?? null) ? $record['leaders'] : [];
                 $participants     = is_array($record['participants'] ?? null) ? $record['participants'] : [];
@@ -292,9 +292,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 </div>
                 <div class="card-body">
                     <div class="grid-2">
-                        <div class="form-group span-2">
-                            <label for="tour_title">Tour Title / Purpose <span class="required">*</span></label>
+                        <div class="form-group" id="form_tour_title">
+                            <label for="tour_title">Tour Title<span class="required">*</span></label>
                             <input type="text" id="tour_title" name="tour_title" value="<?= clean($tourTitle) ?>" placeholder="e.g., Annual Regulatory Facility Overview" required>
+                        </div>
+						<div class="form-group" id="limited_area_check">
+                            <label class="checkbox-inline">
+                                <input type="checkbox" id="is_limited_area" name="is_limited_area" value="1" <?= $isLimitedArea ? 'checked' : '' ?>>
+                                <span>Tour will be in the Limited Area</span>
+                            </label>
                         </div>
                         <div class="grid-3 span-2">
                             <div class="form-group">
@@ -309,12 +315,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                 <label for="time_end">Stop / End Time <span class="required">*</span></label>
                                 <input type="time" id="time_end" name="time_end" value="<?= clean($timeEnd) ?>" required>
                             </div>
-                        </div>
-                        <div class="form-group span-2">
-                            <label class="checkbox-inline">
-                                <input type="checkbox" id="is_secured_area" name="is_secured_area" value="1" <?= $isSecuredArea ? 'checked' : '' ?>>
-                                <span>Is the tour inside the secured area</span>
-                            </label>
                         </div>
                         <div class="form-group span-2">
                             <label for="coordinator_name">Lead Coordinator <span class="required">*</span></label>
