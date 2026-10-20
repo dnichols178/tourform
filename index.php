@@ -51,8 +51,34 @@ foreach ($files as $file) {
     $tours[] = $record;
 }
 
-// Sort newest first
-usort($tours, fn($a, $b) => ($b['created_at'] ?? '') <=> ($a['created_at'] ?? ''));
+// Sort order handling (created, modified, or tour_date)
+$sortBy = (string)($_GET['sort'] ?? 'created');
+
+switch ($sortBy) {
+    case 'modified':
+        usort($tours, function ($a, $b) {
+            $modA = !empty($a['updated_at']) ? (string)$a['updated_at'] : (!empty($a['file_mtime']) ? date('c', (int)$a['file_mtime']) : '');
+            $modB = !empty($b['updated_at']) ? (string)$b['updated_at'] : (!empty($b['file_mtime']) ? date('c', (int)$b['file_mtime']) : '');
+            return $modB <=> $modA;
+        });
+        break;
+
+    case 'tour_date':
+        usort($tours, function ($a, $b) {
+            $dateA = (string)($a['tour_date'] ?? '');
+            $dateB = (string)($b['tour_date'] ?? '');
+            if ($dateA === '' && $dateB !== '') return 1;
+            if ($dateB === '' && $dateA !== '') return -1;
+            return $dateB <=> $dateA;
+        });
+        break;
+
+    case 'created':
+    default:
+        $sortBy = 'created';
+        usort($tours, fn($a, $b) => ($b['created_at'] ?? '') <=> ($a['created_at'] ?? ''));
+        break;
+}
 
 $totalTours = count($tours);
 $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) : 0;
@@ -96,6 +122,28 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
             text-transform: uppercase;
             border: 1px solid #cbd5e1;
         }
+        .dashboard-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .sort-select {
+            padding: 7px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background-color: #ffffff;
+            font-size: 13px;
+            color: #374151;
+            outline: none;
+            cursor: pointer;
+            height: 38px;
+            box-sizing: border-box;
+        }
+        .sort-select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -137,8 +185,17 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
         <section class="card">
             <div class="card-header flex-between">
                 <h2>Saved Tour Agendas</h2>
-                <div class="search-box">
-                    <input type="text" id="dashboardSearch" placeholder="Search by title, coordinator, or facility...">
+                <div class="dashboard-controls">
+                    <div class="search-box">
+                        <input type="text" id="dashboardSearch" placeholder="Search by title, coordinator, or facility...">
+                    </div>
+                    <div class="sort-box">
+                        <select id="sortSelect" class="sort-select">
+                            <option value="created" <?= $sortBy === 'created' ? 'selected' : '' ?>>Sort: Created Date</option>
+                            <option value="modified" <?= $sortBy === 'modified' ? 'selected' : '' ?>>Sort: Modified Date</option>
+                            <option value="tour_date" <?= $sortBy === 'tour_date' ? 'selected' : '' ?>>Sort: Tour Date</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
@@ -160,13 +217,21 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                             $hasMap = !empty($t['route_image_data']);
                             $isDraft = (isset($t['status']) && strtolower((string)$t['status']) === 'draft');
 
+                            $modifiedTimestamp = !empty($t['updated_at']) 
+                                ? (string)$t['updated_at'] 
+                                : (!empty($t['file_mtime']) ? date('c', (int)$t['file_mtime']) : '');
+
                             $facilityNames = [];
                             foreach (($t['stops'] ?? []) as $st) {
                                 if (!empty($st['name'])) $facilityNames[] = $st['name'];
                             }
                             $searchableText = strtolower($title . ' ' . $coord . ' ' . ($isDraft ? 'draft' : '') . ' ' . implode(' ', $facilityNames));
                         ?>
-                            <div class="tour-record-card" data-search="<?= htmlspecialchars($searchableText, ENT_QUOTES, 'UTF-8') ?>">
+                            <div class="tour-record-card" 
+                                 data-search="<?= htmlspecialchars($searchableText, ENT_QUOTES, 'UTF-8') ?>"
+                                 data-created="<?= htmlspecialchars($t['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                 data-modified="<?= htmlspecialchars($modifiedTimestamp, ENT_QUOTES, 'UTF-8') ?>"
+                                 data-tour-date="<?= htmlspecialchars($t['tour_date'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                 <div class="record-card-header">
                                     <div>
                                         <h3 class="record-title"><?= $title ?></h3>
@@ -215,10 +280,14 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
 
     <script>
         const searchInput = document.getElementById('dashboardSearch');
-        const cards = document.querySelectorAll('.tour-record-card');
+        const sortSelect = document.getElementById('sortSelect');
+        const recordsGrid = document.getElementById('recordsGrid');
+
+        // Dynamic client-side search
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase().trim();
+                const cards = document.querySelectorAll('.tour-record-card');
                 cards.forEach(card => {
                     const text = card.getAttribute('data-search') || '';
                     if (query === '' || text.includes(query)) {
@@ -227,6 +296,45 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                         card.style.display = 'none';
                     }
                 });
+            });
+        }
+
+        // Dynamic instant reordering without page reload
+        function sortCards(criteria) {
+            if (!recordsGrid) return;
+            const cardsArray = Array.from(recordsGrid.querySelectorAll('.tour-record-card'));
+
+            cardsArray.sort((a, b) => {
+                let valA = '';
+                let valB = '';
+
+                if (criteria === 'modified') {
+                    valA = a.getAttribute('data-modified') || '';
+                    valB = b.getAttribute('data-modified') || '';
+                } else if (criteria === 'tour_date') {
+                    valA = a.getAttribute('data-tour-date') || '';
+                    valB = b.getAttribute('data-tour-date') || '';
+                    if (!valA && valB) return 1;
+                    if (!valB && valA) return -1;
+                } else {
+                    valA = a.getAttribute('data-created') || '';
+                    valB = b.getAttribute('data-created') || '';
+                }
+
+                return valB.localeCompare(valA);
+            });
+
+            cardsArray.forEach(card => recordsGrid.appendChild(card));
+
+            // Silently persist sort state in the browser URL
+            const url = new URL(window.location.href);
+            url.searchParams.set('sort', criteria);
+            window.history.replaceState({}, '', url);
+        }
+
+        if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+                sortCards(e.target.value);
             });
         }
     </script>
