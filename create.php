@@ -281,6 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
         </header>
 
         <form id="tourForm" action="generate.php" method="POST">
+			<input type="hidden" id="tour_id" name="tour_id" value="<?= htmlspecialchars($_GET['id'] ?? '') ?>">
             <?php if ($isEdit): ?>
                 <input type="hidden" name="tour_id" value="<?= clean($tourId) ?>">
             <?php endif; ?>
