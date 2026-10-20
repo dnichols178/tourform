@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
     $coordinatorPhone   = clean($_POST['coordinator_phone'] ?? '');
     $coordinatorEmail   = clean($_POST['coordinator_email'] ?? '');
     $generalNotes       = clean($_POST['general_notes'] ?? '');
-    $isSecuredArea      = !empty($_POST['is_secured_area']);
+    $isLimitedArea      = !empty($_POST['is_limited_area']);
     $showArrows         = !empty($_POST['show_arrows']);
 
     // Capture, preserve, and sanitize route image payload
@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
         'coordinator_phone'   => $coordinatorPhone,
         'coordinator_email'   => $coordinatorEmail,
         'general_notes'       => $generalNotes,
-        'is_secured_area'     => $isSecuredArea,
+        'is_limited_area'     => $isLimitedArea,
         'show_arrows'         => $showArrows,
         'leaders'             => $leaders,
         'participants'        => $participants,
@@ -219,7 +219,7 @@ $coordinatorName    = $tourRecord['coordinator_name'] ?? '';
 $coordinatorPhone   = $tourRecord['coordinator_phone'] ?? '';
 $coordinatorEmail   = $tourRecord['coordinator_email'] ?? '';
 $generalNotes       = $tourRecord['general_notes'] ?? '';
-$isSecuredArea      = !empty($tourRecord['is_secured_area']);
+$isLimitedArea      = !empty($tourRecord['is_limited_area']);
 $leaders            = $tourRecord['leaders'] ?? [];
 $participants       = $tourRecord['participants'] ?? [];
 $rawStops           = $tourRecord['stops'] ?? [];
@@ -382,7 +382,7 @@ $hasRouteMap = is_string($routeImageData) && (
         .section-break-next-page {
             break-before: page !important;
             page-break-before: always !important;
-            margin-top: 24px !important;
+            /*margin-top: 24px !important;*/
         }
 
         /* Default Start Location Row Highlight in Section 2 Itinerary */
@@ -492,9 +492,6 @@ $hasRouteMap = is_string($routeImageData) && (
         <header class="report-header">
             <div class="report-meta-top">
                 <span class="badge">TOUR AGENDA & BRIEFING</span>
-                <?php if ($isSecuredArea): ?>
-                    <span class="badge" style="background-color: #b91c1c; color: #ffffff; margin-left: 6px;">NO CONTROLLED ARTICLES</span>
-                <?php endif; ?>
                 <span class="report-date">Date of Tour: <?= $formattedDate ?></span>
             </div>
             <h2 class="report-title-page2"><?= $tourTitle ?> Tour</h2>
@@ -505,20 +502,26 @@ $hasRouteMap = is_string($routeImageData) && (
                 <div>
                     <strong>Lead Coordinator:</strong> <?= $coordinatorName ?> <br/> <?= $coordinatorPhone ?> &bull; <?= $coordinatorEmail ?>
                 </div>
-                <?php if ($isSecuredArea): ?>
-                    <div style="grid-column: span 2; margin-top: 6px; font-size: 13px; font-weight: 700; color: #b91c1c;">
-                        Security Notice: Tour inside secured area &bull; No controlled articles
-                    </div>
-                <?php endif; ?>
             </div>
+				<h3 class="section-title" style="margin-top:15px">Tour Requirements</h3>
+				<div class="tour-info-compact">
+                    <ul>
+						<li>Attendees must be a U.S. Citizen, not a dual citizen, and 18 years of age or older with a valid driver’s license</li>
+						<li>Prohibited articles: firearms (even if attendees possess a concelaed carry permit), ammuniition, weapons, explosives and controlled substances (illegal drugs, drug paraphernalia and intoxicants)</li>
+					<?php if ($isLimitedArea): ?>
+						<li>Controlled articles: computers, laptops, memory capable calculators, cell phones, transmitting radios or any device capable of capturing or recording images</li>
+						<li>Clothing must be appropriate for an industrial environment. Closed-toe shoes are mandatory. No open-toe shoes, sandals, flip flops or high-heel shoes are permitted. Short-sleeve shirts, knee-length shorts, or capris are acceptable, but skirts and sleeveless shirts are not allowed. Long pants and comfortable shoes are encouraged and highly recommended.</li> 
+					<?php endif; ?>
+					</ul>
+				</div>
         </header>
 
         <!-- Personnel & Roster (Section 1) -->
         <section class="report-section compact-section" id="sectionRoster">
-            <h3 class="section-title">1. Personnel Roster</h3>
+            <h3 class="section-title">1. Personnel</h3>
             <div class="grid-2 roster-tables">
                 <div>
-                    <h4 class="roster-heading">Tour Escorts & Leaders</h4>
+                    <h4 class="roster-heading">Tour Leaders and Escorts</h4>
                     <ul class="roster-list">
                         <?php if (empty($leaders)): ?>
                             <li class="empty-text">None specified</li>
@@ -559,7 +562,7 @@ $hasRouteMap = is_string($routeImageData) && (
             <div class="flex-between">
                 <h3 class="section-title">2. Facility Itinerary & Subject Matter Experts</h3>
                 <div class="time-summary-tag">
-                    Allocated: <strong><?= $totalAllocatedMinutes ?></strong> / <strong><?= $totalTourMinutes ?></strong> mins
+                    Time at Stops: <strong><?= $totalAllocatedMinutes ?></strong> / <strong><?= $totalTourMinutes ?></strong> mins
                 </div>
             </div>
             <?php if (empty($stops)): ?>
@@ -605,15 +608,10 @@ $hasRouteMap = is_string($routeImageData) && (
         <?php endif; ?>
 
         <!-- Protocol & Safety Notes (Section 4) -->
-        <?php if (!empty($generalNotes) || $isSecuredArea): ?>
+		<?php if (!empty($generalNotes)): ?>
             <section class="report-section compact-section" id="sectionNotes">
                 <h3 class="section-title">4. Operational Protocols, Safety & Contingency Plans</h3>
                 <div class="notes-content-compact">
-                    <?php if ($isSecuredArea): ?>
-                        <div style="margin-bottom: 8px; font-weight: 700; color: #b91c1c;">
-                            Security Protocol: Tour is inside the secured area &ndash; No controlled articles.
-                        </div>
-                    <?php endif; ?>
                     <?= nl2br($generalNotes) ?>
                 </div>
             </section>
