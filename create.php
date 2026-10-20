@@ -293,13 +293,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 </div>
                 <div class="card-body">
                     <div class="grid-2">
-                        <div class="d-flex align-items-center gap-2">
-    						<input type="text" class="form-control" id="tour_title" name="tour_title" placeholder="Tour Title" required>
-    						<span id="autosave_status" class="text-muted small" style="white-space: nowrap;"></span>
-						</div>
 						<div class="form-group" id="form_tour_title">
                             <label for="tour_title">Tour Title<span class="required">*</span></label>
-                            <input type="text" id="tour_title" name="tour_title" value="<?= clean($tourTitle) ?>" placeholder="e.g., Annual Regulatory Facility Overview" required>
+                            <input type="text" id="tour_title" class="form-control" name="tour_title" value="<?= clean($tourTitle) ?>" placeholder="e.g., Annual Regulatory Facility Overview" required>
+							<span id="autosave_status" class="text-muted small" style="white-space: nowrap;"></span>
                         </div>
 						<div class="form-group" id="limited_area_check">
                             <label class="checkbox-inline">
