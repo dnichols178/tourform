@@ -1,0 +1,45 @@
+<?php
+// save_draft.php
+header('Content-Type: application/json');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+    exit;
+}
+
+$rawInput = file_get_contents('php://input');
+$data = json_decode($rawInput, true);
+
+if (!$data || empty(trim($data['tour_title'] ?? ''))) {
+    echo json_encode(['success' => false, 'error' => 'Tour title is required before saving.']);
+    exit;
+}
+
+$dataDir = __DIR__ . '/data/tours';
+if (!is_dir($dataDir)) {
+    mkdir($dataDir, 0775, true);
+}
+
+// Reuse existing ID if already assigned during this editing session
+$tourId = !empty($data['tour_id']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $data['tour_id']) : null;
+
+if (!$tourId) {
+    $tourId = 'tour_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3));
+}
+
+$data['tour_id'] = $tourId;
+$data['status'] = 'draft';
+$data['updated_at'] = date('c');
+
+$filePath = $dataDir . '/' . $tourId . '.json';
+$saved = file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+if ($saved !== false) {
+    echo json_encode([
+        'success' => true,
+        'tour_id' => $tourId,
+        'saved_at' => date('g:i:s A')
+    ]);
+} else {
+    echo json_encode(['success' => false, 'error' => 'Unable to write tour file.']);
+}
