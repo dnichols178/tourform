@@ -71,6 +71,31 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
             gap: 8px;
             flex-wrap: wrap;
         }
+        .badge-draft {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #64748b;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 5px 12px;
+            border-radius: 4px;
+            user-select: none;
+            line-height: 1.4;
+        }
+        .mini-badge-draft-card {
+            background-color: #e2e8f0;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            border: 1px solid #cbd5e1;
+        }
     </style>
 </head>
 <body>
@@ -133,12 +158,13 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                             $stopCount = (int)$t['stop_count'];
                             $stopMins = (int)$t['total_stop_mins'];
                             $hasMap = !empty($t['route_image_data']);
+                            $isDraft = (isset($t['status']) && strtolower((string)$t['status']) === 'draft');
 
                             $facilityNames = [];
                             foreach (($t['stops'] ?? []) as $st) {
                                 if (!empty($st['name'])) $facilityNames[] = $st['name'];
                             }
-                            $searchableText = strtolower($title . ' ' . $coord . ' ' . implode(' ', $facilityNames));
+                            $searchableText = strtolower($title . ' ' . $coord . ' ' . ($isDraft ? 'draft' : '') . ' ' . implode(' ', $facilityNames));
                         ?>
                             <div class="tour-record-card" data-search="<?= htmlspecialchars($searchableText, ENT_QUOTES, 'UTF-8') ?>">
                                 <div class="record-card-header">
@@ -146,9 +172,14 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                                         <h3 class="record-title"><?= $title ?></h3>
                                         <div class="record-date-badge"><?= $date ?> &bull; <?= $timeWindow ?></div>
                                     </div>
-                                    <?php if ($hasMap): ?>
-                                        <span class="mini-badge-map" title="Includes Vector Route Map">&#128506; Route Map</span>
-                                    <?php endif; ?>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <?php if ($isDraft): ?>
+                                            <span class="mini-badge-draft-card">Draft</span>
+                                        <?php endif; ?>
+                                        <?php if ($hasMap): ?>
+                                            <span class="mini-badge-map" title="Includes Vector Route Map">&#128506; Route Map</span>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                                 <div class="record-meta-list">
                                     <div><strong>Coordinator:</strong> <?= $coord ?></div>
@@ -161,7 +192,13 @@ $avgMinutes = $totalTours > 0 ? (int)round($totalMinutesAllTours / $totalTours) 
                                 </div>
                                 <div class="record-card-actions">
                                     <a href="create.php?id=<?= $id ?>" class="btn btn-primary btn-sm">Edit Tour</a>
-                                    <a href="generate.php?id=<?= $id ?>" class="btn btn-secondary btn-sm">View & Print Report</a>
+                                    
+                                    <?php if ($isDraft): ?>
+                                        <span class="badge-draft">Draft</span>
+                                    <?php else: ?>
+                                        <a href="generate.php?id=<?= $id ?>" class="btn btn-secondary btn-sm">View &amp; Print Report</a>
+                                    <?php endif; ?>
+
                                     <form method="POST" action="index.php" onsubmit="return confirm('Permanently delete this tour record?');">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="<?= $id ?>">
