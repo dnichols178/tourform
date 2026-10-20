@@ -186,8 +186,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
 
     $tourRecord = [
         'id'                  => $tourId,
+        'status'              => 'completed',
         'created_at'          => $createdAt,
         'updated_at'          => date('c'),
+        'generated_at'        => date('c'),
         'tour_title'          => $tourTitle,
         'tour_date'           => $tourDate,
         'time_start'          => $timeStart,
@@ -382,7 +384,6 @@ $hasRouteMap = is_string($routeImageData) && (
         .section-break-next-page {
             break-before: page !important;
             page-break-before: always !important;
-            /*margin-top: 24px !important;*/
         }
 
         /* Default Start Location Row Highlight in Section 2 Itinerary */
@@ -503,17 +504,17 @@ $hasRouteMap = is_string($routeImageData) && (
                     <strong>Lead Coordinator:</strong> <?= $coordinatorName ?> <br/> <?= $coordinatorPhone ?> &bull; <?= $coordinatorEmail ?>
                 </div>
             </div>
-				<h3 class="section-title" style="margin-top:15px">Tour Requirements</h3>
-				<div class="tour-info-compact">
-                    <ul>
-						<li>Attendees must be a U.S. Citizen, not a dual citizen, and 18 years of age or older with a valid driver’s license</li>
-						<li>Prohibited articles: firearms (even if attendees possess a concelaed carry permit), ammuniition, weapons, explosives and controlled substances (illegal drugs, drug paraphernalia and intoxicants)</li>
-					<?php if ($isLimitedArea): ?>
-						<li>Controlled articles: computers, laptops, memory capable calculators, cell phones, transmitting radios or any device capable of capturing or recording images</li>
-						<li>Clothing must be appropriate for an industrial environment. Closed-toe shoes are mandatory. No open-toe shoes, sandals, flip flops or high-heel shoes are permitted. Short-sleeve shirts, knee-length shorts, or capris are acceptable, but skirts and sleeveless shirts are not allowed. Long pants and comfortable shoes are encouraged and highly recommended.</li> 
-					<?php endif; ?>
-					</ul>
-				</div>
+            <h3 class="section-title" style="margin-top:15px">Tour Requirements</h3>
+            <div class="tour-info-compact">
+                <ul>
+                    <li>Attendees must be a U.S. Citizen, not a dual citizen, and 18 years of age or older with a valid driver’s license</li>
+                    <li>Prohibited articles: firearms (even if attendees possess a concelaed carry permit), ammuniition, weapons, explosives and controlled substances (illegal drugs, drug paraphernalia and intoxicants)</li>
+                <?php if ($isLimitedArea): ?>
+                    <li>Controlled articles: computers, laptops, memory capable calculators, cell phones, transmitting radios or any device capable of capturing or recording images</li>
+                    <li>Clothing must be appropriate for an industrial environment. Closed-toe shoes are mandatory. No open-toe shoes, sandals, flip flops or high-heel shoes are permitted. Short-sleeve shirts, knee-length shorts, or capris are acceptable, but skirts and sleeveless shirts are not allowed. Long pants and comfortable shoes are encouraged and highly recommended.</li> 
+                <?php endif; ?>
+                </ul>
+            </div>
         </header>
 
         <!-- Personnel & Roster (Section 1) -->
@@ -608,7 +609,7 @@ $hasRouteMap = is_string($routeImageData) && (
         <?php endif; ?>
 
         <!-- Protocol & Safety Notes (Section 4) -->
-		<?php if (!empty($generalNotes)): ?>
+        <?php if (!empty($generalNotes)): ?>
             <section class="report-section compact-section" id="sectionNotes">
                 <h3 class="section-title">4. Operational Protocols, Safety & Contingency Plans</h3>
                 <div class="notes-content-compact">
