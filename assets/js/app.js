@@ -1616,10 +1616,171 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
+    // Periodic Auto Save Engine (Every 5 seconds)
+    // -------------------------------------------------------------
+    let autoSaveTimer = null;
+    let lastSavedHash = '';
+    let isSubmitting = false;
+
+    function collectAutoSavePayload() {
+        const titleInput = document.getElementById('tour_title');
+        const tourTitle = titleInput ? titleInput.value.trim() : '';
+
+        // Strictly enforce title requirement before creating or modifying JSON drafts
+        if (!tourTitle) {
+            return null;
+        }
+
+        const idInput = document.getElementById('tour_id') || document.querySelector('input[name="tour_id"]');
+        const tourId = idInput ? idInput.value.trim() : '';
+
+        // Capture current canvas map preview
+        let currentMapData = '';
+        if (canvas) {
+            currentMapData = canvas.toDataURL('image/png');
+        }
+
+        // Capture leaders
+        const leaderNames = Array.from(document.querySelectorAll('input[name="leader_names[]"]')).map(i => i.value);
+        const leaderOrgs = Array.from(document.querySelectorAll('input[name="leader_orgs[]"]')).map(i => i.value);
+
+        // Capture participants
+        const partNames = Array.from(document.querySelectorAll('input[name="participant_names[]"]')).map(i => i.value);
+        const partOrgs = Array.from(document.querySelectorAll('.participant-org-input, input[name="participant_orgs[]"]')).map(i => {
+            return (sameOrgToggle && sameOrgToggle.checked && commonOrgInput) ? commonOrgInput.value : i.value;
+        });
+
+        // Capture stops
+        const facNames = Array.from(document.querySelectorAll('input[name="facility_names[]"]')).map(i => i.value);
+        const facMinutes = Array.from(document.querySelectorAll('input[name="facility_minutes[]"]')).map(i => i.value);
+        const facArrivals = Array.from(document.querySelectorAll('input[name="facility_arrival_times[]"]')).map(i => i.value);
+        const facSmes = Array.from(document.querySelectorAll('input[name="facility_smes[]"]')).map(i => i.value);
+        const facNotes = Array.from(document.querySelectorAll('textarea[name="facility_notes[]"]')).map(i => i.value);
+        const facIsStart = Array.from(document.querySelectorAll('input[name="facility_is_start[]"]')).map(i => i.value);
+
+        const limitedAreaInput = document.getElementById('is_limited_area') || document.querySelector('input[name="is_limited_area"]');
+        const showArrowsInput = document.getElementById('show_arrows') || document.querySelector('input[name="show_arrows"]');
+
+        return {
+            tour_id: tourId,
+            tour_title: tourTitle,
+            tour_date: document.getElementById('tour_date')?.value || '',
+            time_start: timeStartInput?.value || '',
+            time_end: timeEndInput?.value || '',
+            coordinator_name: document.getElementById('coordinator_name')?.value || '',
+            coordinator_phone: coordinatorPhoneInput?.value || '',
+            coordinator_email: document.getElementById('coordinator_email')?.value || '',
+            general_notes: document.getElementById('general_notes')?.value || '',
+            is_limited_area: limitedAreaInput ? (limitedAreaInput.checked ? 1 : 0) : 0,
+            show_arrows: showArrowsInput ? (showArrowsInput.checked ? 1 : 0) : 1,
+            leader_names: leaderNames,
+            leader_orgs: leaderOrgs,
+            participant_names: partNames,
+            participant_orgs: partOrgs,
+            facility_names: facNames,
+            facility_minutes: facMinutes,
+            facility_arrival_times: facArrivals,
+            facility_smes: facSmes,
+            facility_notes: facNotes,
+            facility_is_start: facIsStart,
+            route_image_data: currentMapData,
+            map_state: typeof window.getMapEngineState === 'function' ? window.getMapEngineState() : null
+        };
+    }
+
+    async function triggerAutoSave() {
+        if (isSubmitting) return;
+
+        const payload = collectAutoSavePayload();
+        if (!payload) {
+            const statusEl = document.getElementById('autosave_status');
+            if (statusEl && !document.getElementById('tour_title')?.value.trim()) {
+                statusEl.textContent = 'Enter title to enable auto save';
+                statusEl.style.color = '#94a3b8';
+            }
+            return;
+        }
+
+        // Compare content hash without route_image_data to prevent redundant network writes
+        const hashCheck = JSON.stringify({ ...payload, route_image_data: '' });
+        if (hashCheck === lastSavedHash) {
+            return;
+        }
+
+        const statusEl = document.getElementById('autosave_status');
+        if (statusEl) {
+            statusEl.textContent = 'Auto saving draft...';
+            statusEl.style.color = '#d97706';
+        }
+
+        try {
+            const response = await fetch('save_draft.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) return;
+
+            const res = await response.json();
+            if (res && res.success) {
+                lastSavedHash = hashCheck;
+
+                // Sync generated tour_id into DOM and URL so subsequent saves overwrite this draft
+                let idInput = document.getElementById('tour_id');
+                if (!idInput) {
+                    idInput = document.querySelector('input[name="tour_id"]');
+                }
+                if (idInput && (!idInput.value || idInput.value !== res.tour_id)) {
+                    idInput.value = res.tour_id;
+                }
+
+                // Update URL query parameter silently
+                const currentUrl = new URL(window.location.href);
+                if (currentUrl.searchParams.get('id') !== res.tour_id) {
+                    currentUrl.searchParams.set('id', res.tour_id);
+                    window.history.replaceState({}, '', currentUrl);
+                }
+
+                if (statusEl) {
+                    statusEl.textContent = `Draft auto saved (${res.saved_at || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})`;
+                    statusEl.style.color = '#16a34a';
+                }
+            } else if (statusEl && res && res.error) {
+                statusEl.textContent = res.error;
+                statusEl.style.color = '#dc2626';
+            }
+        } catch (err) {
+            if (statusEl) {
+                statusEl.textContent = 'Auto save failed';
+                statusEl.style.color = '#dc2626';
+            }
+        }
+    }
+
+    // Start 5-second interval
+    autoSaveTimer = setInterval(triggerAutoSave, 5000);
+
+    // Immediate auto save check when user enters a title
+    const tourTitleInput = document.getElementById('tour_title');
+    if (tourTitleInput) {
+        tourTitleInput.addEventListener('blur', () => {
+            if (tourTitleInput.value.trim()) {
+                triggerAutoSave();
+            }
+        });
+    }
+
+    // -------------------------------------------------------------
     // Form Submit Handler
     // -------------------------------------------------------------
     if (tourForm) {
         tourForm.addEventListener('submit', (e) => {
+            isSubmitting = true;
+            if (autoSaveTimer) {
+                clearInterval(autoSaveTimer);
+            }
+
             // Final consistency pass: resolve any remaining timing overlaps
             cascadeItineraryTimes(0, true);
 
@@ -1636,6 +1797,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     `Warning: Scheduled facility stops total ${totalAllocated} minutes, exceeding the tour window of ${totalTourMins} minutes by ${overMins} minutes.\n\nDo you want to proceed and generate the report anyway?`
                 );
                 if (!proceed) {
+                    isSubmitting = false;
+                    autoSaveTimer = setInterval(triggerAutoSave, 5000);
                     e.preventDefault();
                     return;
                 }
