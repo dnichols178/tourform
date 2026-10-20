@@ -20,6 +20,7 @@ $coordinatorName = '';
 $coordinatorPhone = '';
 $coordinatorEmail = '';
 $generalNotes = '';
+$isSecuredArea = false;
 $showArrows = true;
 $leaders = [];
 $participants = [];
@@ -46,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                 $coordinatorPhone = (string)($record['coordinator_phone'] ?? '');
                 $coordinatorEmail = (string)($record['coordinator_email'] ?? '');
                 $generalNotes     = (string)($record['general_notes'] ?? '');
+                $isSecuredArea    = !empty($record['is_secured_area']);
                 $showArrows       = !empty($record['show_arrows']);
                 $leaders          = is_array($record['leaders'] ?? null) ? $record['leaders'] : [];
                 $participants     = is_array($record['participants'] ?? null) ? $record['participants'] : [];
@@ -309,6 +311,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                             </div>
                         </div>
                         <div class="form-group span-2">
+                            <label class="checkbox-inline">
+                                <input type="checkbox" id="is_secured_area" name="is_secured_area" value="1" <?= $isSecuredArea ? 'checked' : '' ?>>
+                                <span>Is the tour inside the secured area</span>
+                            </label>
+                        </div>
+                        <div class="form-group span-2">
                             <label for="coordinator_name">Lead Coordinator <span class="required">*</span></label>
                             <input type="text" id="coordinator_name" name="coordinator_name" value="<?= clean($coordinatorName) ?>" placeholder="Coordinator Full Name" required>
                         </div>
@@ -543,7 +551,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                     $sArrival = clean($s['arrival_time'] ?? ($s['arrival'] ?? ''));
                                 }
                                 
-                                $isExpanded = $isStart; // Start location expanded by default, all others collapsed
+                                $isExpanded =$isStart; // Start location expanded by default, all others collapsed
                             ?>
                                 <div class="stop-card dynamic-stop <?= $isStart ? 'is-start-stop' : '' ?>" data-is-start="<?= $isStart ? '1' : '0' ?>" data-expanded="<?= $isExpanded ? 'true' : 'false' ?>">
                                     <input type="hidden" name="facility_is_start[]" value="<?= $isStart ? '1' : '0' ?>">
@@ -557,10 +565,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                                 <span class="stop-number">Stop <?= $sNum ?></span>
                                             <?php endif; ?>
                                             <span class="stop-header-preview"><?= $sName ?: ($isStart ? 'Start Location (Required)' : 'New Stop') ?></span>
-                                            <span class="stop-header-time-pill"><?= $isStart ? '0 min (Tour Start)' : (($sMins !== '' && $sMins >= 0) ? $sMins . ' min' : '-- min') ?></span>
+                                            <span class="stop-header-time-pill"><?= $isStart ? '0 min (Tour Start)' : (($sMins !== '' && $sMins >= 0) ?$sMins . ' min' : '-- min') ?></span>
                                         </div>
                                         <div class="stop-header-actions">
-                                            <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="<?= ($isStart || $idx === 1) ? 'display: none;' : '' ?>">&#9650;</button>
+                                            <button type="button" class="btn-reorder btn-move-up" title="Move Up" style="<?= ($isStart ||$idx === 1) ? 'display: none;' : '' ?>">&#9650;</button>
                                             <button type="button" class="btn-reorder btn-move-down" title="Move Down" style="<?= ($isStart || $idx === count($stops) - 1) ? 'display: none;' : '' ?>">&#9660;</button>
                                             <?php if (!$isStart): ?>
                                                 <button type="button" class="btn btn-icon btn-remove-stop" title="Remove Stop">&times;</button>
@@ -575,7 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                                             </div>
                                             <div class="form-group span-2">
                                                 <label>Scheduled Duration (Minutes) <span class="required">*</span></label>
-                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $isStart ? 0 : (($sMins !== '' && $sMins >= 0) ? $sMins : '') ?>" min="0" max="1440" <?= $isStart ? 'readonly' : '' ?> placeholder="<?= $isStart ? '0 (Start Location)' : 'e.g., 30 (or 0 for drive-by)' ?>" required>
+                                                <input type="number" name="facility_minutes[]" class="facility-minutes-input" value="<?= $isStart ? 0 : (($sMins !== '' && $sMins >= 0) ?$sMins : '') ?>" min="0" max="1440" <?= $isStart ? 'readonly' : '' ?> placeholder="<?= $isStart ? '0 (Start Location)' : 'e.g., 30 (or 0 for drive-by)' ?>" required>
                                             </div>
                                             <div class="form-group span-2 arrival-time-group">
                                                 <label><?= $isStart ? 'Arrival / Start Time' : 'Arrival Time' ?> <span class="arrival-required-star required" style="<?= ($isStart || ($sMins !== '' && (int)$sMins > 0)) ? 'display:inline;' : 'display:none;' ?>">*</span></label>
