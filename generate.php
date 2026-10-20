@@ -99,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
     $coordinatorPhone   = clean($_POST['coordinator_phone'] ?? '');
     $coordinatorEmail   = clean($_POST['coordinator_email'] ?? '');
     $generalNotes       = clean($_POST['general_notes'] ?? '');
+    $isSecuredArea      = !empty($_POST['is_secured_area']);
     $showArrows         = !empty($_POST['show_arrows']);
 
     // Capture, preserve, and sanitize route image payload
@@ -195,6 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
         'coordinator_phone'   => $coordinatorPhone,
         'coordinator_email'   => $coordinatorEmail,
         'general_notes'       => $generalNotes,
+        'is_secured_area'     => $isSecuredArea,
         'show_arrows'         => $showArrows,
         'leaders'             => $leaders,
         'participants'        => $participants,
@@ -217,6 +219,7 @@ $coordinatorName    = $tourRecord['coordinator_name'] ?? '';
 $coordinatorPhone   = $tourRecord['coordinator_phone'] ?? '';
 $coordinatorEmail   = $tourRecord['coordinator_email'] ?? '';
 $generalNotes       = $tourRecord['general_notes'] ?? '';
+$isSecuredArea      = !empty($tourRecord['is_secured_area']);
 $leaders            = $tourRecord['leaders'] ?? [];
 $participants       = $tourRecord['participants'] ?? [];
 $rawStops           = $tourRecord['stops'] ?? [];
@@ -489,6 +492,9 @@ $hasRouteMap = is_string($routeImageData) && (
         <header class="report-header">
             <div class="report-meta-top">
                 <span class="badge">TOUR AGENDA & BRIEFING</span>
+                <?php if ($isSecuredArea): ?>
+                    <span class="badge" style="background-color: #b91c1c; color: #ffffff; margin-left: 6px;">NO CONTROLLED ARTICLES</span>
+                <?php endif; ?>
                 <span class="report-date">Date of Tour: <?= $formattedDate ?></span>
             </div>
             <h2 class="report-title-page2"><?= $tourTitle ?> Tour</h2>
@@ -499,6 +505,11 @@ $hasRouteMap = is_string($routeImageData) && (
                 <div>
                     <strong>Lead Coordinator:</strong> <?= $coordinatorName ?> <br/> <?= $coordinatorPhone ?> &bull; <?= $coordinatorEmail ?>
                 </div>
+                <?php if ($isSecuredArea): ?>
+                    <div style="grid-column: span 2; margin-top: 6px; font-size: 13px; font-weight: 700; color: #b91c1c;">
+                        Security Notice: Tour inside secured area &bull; No controlled articles
+                    </div>
+                <?php endif; ?>
             </div>
         </header>
 
@@ -594,10 +605,15 @@ $hasRouteMap = is_string($routeImageData) && (
         <?php endif; ?>
 
         <!-- Protocol & Safety Notes (Section 4) -->
-        <?php if (!empty($generalNotes)): ?>
+        <?php if (!empty($generalNotes) || $isSecuredArea): ?>
             <section class="report-section compact-section" id="sectionNotes">
                 <h3 class="section-title">4. Operational Protocols, Safety & Contingency Plans</h3>
                 <div class="notes-content-compact">
+                    <?php if ($isSecuredArea): ?>
+                        <div style="margin-bottom: 8px; font-weight: 700; color: #b91c1c;">
+                            Security Protocol: Tour is inside the secured area &ndash; No controlled articles.
+                        </div>
+                    <?php endif; ?>
                     <?= nl2br($generalNotes) ?>
                 </div>
             </section>
