@@ -279,19 +279,14 @@ foreach ($rawStops as $idx => $s) {
 
     // Row 1 / Tour Start
     if ($idx === 0) {
-        // Arrival time is empty (shown as "--")
         $arrivalDisplay = '--';
-        // Duration reads "Tour Start"
         $durationDisplay = 'Tour Start';
-        // Departure is the tour start time
         $depSourceTime = !empty($timeStart) ? $timeStart : $arrivalTime;
         $depFormatted = formatTime12($depSourceTime);
         $departDisplay = $depFormatted !== '' ? $depFormatted : '--';
     } else {
-        // Subsequent rows
         $totalAllocatedMinutes += $minutes;
 
-        // Arrival time from create.php
         if ($arrivalTime !== '') {
             $formattedArrival = formatTime12($arrivalTime);
             $arrivalDisplay = $formattedArrival !== '' ? $formattedArrival : '--';
@@ -299,11 +294,9 @@ foreach ($rawStops as $idx => $s) {
             $arrivalDisplay = '--';
         }
 
-        // Duration display
         $unit = ($minutes === 1) ? 'minute' : 'minutes';
         $durationDisplay = "{$minutes} {$unit}";
 
-        // Calculated departure time: Arrival + Duration
         if ($arrivalTime !== '') {
             $depCalculated = calculateDepartureTime($arrivalTime, $minutes);
             $departDisplay = $depCalculated !== '' ? $depCalculated : '--';
@@ -408,23 +401,87 @@ $hasRouteMap = is_string($routeImageData) && (
         }
 
         @media print {
+            @page {
+                size: letter portrait;
+                margin: 0.4in;
+            }
+
+            /* 1. Eliminate dark theme backgrounds and force pure white */
+            html, body, .report-body {
+                background: #ffffff !important;
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                min-width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                box-shadow: none !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* 2. Hide toolbar completely */
+            .no-print, .report-toolbar {
+                display: none !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* 3. Strip screen sheet shadows and borders */
+            .report-sheet {
+                background: #ffffff !important;
+                background-color: #ffffff !important;
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-height: 0 !important;
+            }
+
+            /* 4. Exact Cover Page Height without overflowing printable area */
             .cover-page-sheet {
-                height: 98vh !important;
-                min-height: 98vh !important;
-                max-height: 98vh !important;
+                box-sizing: border-box !important;
+                height: 9.8in !important;
+                min-height: 9.8in !important;
+                max-height: 9.8in !important;
                 page-break-after: always !important;
                 break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                display: flex !important;
+                flex-direction: column !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
+
+            .cover-page-inner {
+                height: 100% !important;
+                min-height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                box-sizing: border-box !important;
+            }
+
             .cover-footer-note {
                 margin-top: auto !important;
                 position: relative !important;
                 bottom: 0 !important;
             }
+
+            /* 5. Prevent trailing blank page on final sheet */
             .briefing-page-sheet {
                 height: auto !important;
                 min-height: auto !important;
                 overflow: visible !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
             }
+
             .route-map-section {
                 width: 100% !important;
                 break-inside: avoid !important;
@@ -508,7 +565,7 @@ $hasRouteMap = is_string($routeImageData) && (
             <div class="tour-info-compact">
                 <ul>
                     <li>Attendees must be a U.S. Citizen, not a dual citizen, and 18 years of age or older with a valid driver’s license</li>
-                    <li>Prohibited articles: firearms (even if attendees possess a concelaed carry permit), ammuniition, weapons, explosives and controlled substances (illegal drugs, drug paraphernalia and intoxicants)</li>
+                    <li>Prohibited articles: firearms (even if attendees possess a concealed carry permit), ammunition, weapons, explosives and controlled substances (illegal drugs, drug paraphernalia and intoxicants)</li>
                 <?php if ($isLimitedArea): ?>
                     <li>Controlled articles: computers, laptops, memory capable calculators, cell phones, transmitting radios or any device capable of capturing or recording images</li>
                     <li>Clothing must be appropriate for an industrial environment. Closed-toe shoes are mandatory. No open-toe shoes, sandals, flip flops or high-heel shoes are permitted. Short-sleeve shirts, knee-length shorts, or capris are acceptable, but skirts and sleeveless shirts are not allowed. Long pants and comfortable shoes are encouraged and highly recommended.</li> 
