@@ -296,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
 						<div class="form-group" id="form_tour_title">
                             <label for="tour_title">Tour Title<span class="required">*</span></label>
                             <input type="text" id="tour_title" class="form-control" name="tour_title" value="<?= clean($tourTitle) ?>" placeholder="e.g., Annual Regulatory Facility Overview" required>
-							<span id="autosave_status" class="text-muted small" style="white-space: nowrap;"></span>
+							<span id="autosave_status" class="text-muted small" style="white-space: nowrap; font-size:10px; padding: 5px 0px 0px 5px;"></span>
                         </div>
 						<div class="form-group" id="limited_area_check">
                             <label class="checkbox-inline">
@@ -492,7 +492,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['id'])) {
                             </button>
                             <span class="zoom-level-badge" id="zoomLevelBadge">100%</span>
                         </div>
-                        <canvas id="routeCanvas" width="900" height="580"></canvas>
+                        <canvas id="routeCanvas" width="900" height="780"></canvas>
                         <div id="mapTooltip" class="map-tooltip" style="display: none;"></div>
                         <div id="gisStatusMessage" class="gis-status-banner" style="display: none;"></div>
                     </div>
