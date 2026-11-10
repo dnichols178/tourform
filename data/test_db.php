@@ -1,48 +1,58 @@
 <?php
 // --- Database Connection Variables ---
-// Format: "ServerName\InstanceName" or "IPAddress,Port"
-$serverName = "192.168.1.50,1433"; 
-$username = "your_sql_username";
-$password = "your_sql_password";
-$database = "master"; // Connect to master to evaluate server-level permissions
+$serverName = "DRMSQL003"; 
 
-echo "<h3>SQL Server Connection & Permission Test</h3>";
+echo "<h3>SQL Server Connection & Database Access Test</h3>";
 
 try {
-    // 1) Test connection to the remote SQL Server
-    // TrustServerCertificate=1 is useful for testing without a valid SSL cert on the SQL Server
-    $dsn = "sqlsrv:Server=$serverName;Database=$database;TrustServerCertificate=1";
-    $conn = new PDO($dsn, $username, $password);
+    // 1) Test connection using Windows Authentication
+    // Omitting the "Database=" parameter connects to the user's default database.
+    $dsn = "sqlsrv:Server=$serverName;TrustServerCertificate=1";
     
-    // Set PDO to throw exceptions on error
+    $conn = new PDO($dsn);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    echo "<p style='color: green;'>✅ Successfully connected to the remote SQL Server.</p>";
+    
+    echo "<p style='color: green;'>✅ Successfully connected to <strong>$serverName</strong>.</p>";
 
-    // 2) Check account permissions to create databases
-    // A user can create a database if they are a sysadmin, a member of the dbcreator role, 
-    // or if they have been explicitly granted 'CREATE ANY DATABASE' permission.
-    $query = "
-        SELECT 
-            IS_SRVROLEMEMBER('sysadmin') AS is_sysadmin,
-            IS_SRVROLEMEMBER('dbcreator') AS is_dbcreator,
-            HAS_PERMS_BY_NAME(null, null, 'CREATE ANY DATABASE') AS can_create_any_database
+    // 2) Identify which Windows Account made the connection
+    $identityQuery = "SELECT SUSER_SNAME() AS CurrentUser";
+    $identityStmt = $conn->query($identityQuery);
+    $identityRow = $identityStmt->fetch(PDO::FETCH_ASSOC);
+    $currentUser = htmlspecialchars($identityRow['CurrentUser']);
+    echo "<p><strong>Connected as:</strong> " . $currentUser . "</p>";
+
+    // 3) List all databases this account has permission to access
+    // HAS_DBACCESS returns 1 if the user has access to the database
+    $dbQuery = "
+        SELECT name 
+        FROM sys.databases 
+        WHERE HAS_DBACCESS(name) = 1 
+        ORDER BY name
     ";
     
-    $stmt = $conn->query($query);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $dbStmt = $conn->query($dbQuery);
     
-    // Evaluate the results
-    if ($row['is_sysadmin'] == 1 || $row['is_dbcreator'] == 1 || $row['can_create_any_database'] == 1) {
-        echo "<p style='color: green;'>✅ The account <strong>HAS</strong> permissions to create databases on this SQL Server.</p>";
+    echo "<h4>Accessible Databases:</h4>";
+    echo "<ul>";
+    
+    $dbCount = 0;
+    while ($dbRow = $dbStmt->fetch(PDO::FETCH_ASSOC)) {
+        echo "<li>" . htmlspecialchars($dbRow['name']) . "</li>";
+        $dbCount++;
+    }
+    
+    echo "</ul>";
+
+    if ($dbCount === 0) {
+        echo "<p style='color: orange;'>⚠️ This account connected successfully to the server but does not have access to any databases.</p>";
     } else {
-        echo "<p style='color: red;'>❌ The account <strong>DOES NOT HAVE</strong> permissions to create databases.</p>";
+        echo "<p><em>Total accessible databases: $dbCount</em></p>";
     }
     
 } catch (PDOException $e) {
-    // Catch and display connection or query errors
     echo "<p style='color: red;'>❌ Connection failed: " . htmlspecialchars($e->getMessage()) . "</p>";
+    echo "<p><em>Note: If this fails, the IIS Application Pool Identity (likely a local virtual account or machine account) does not have a login mapped on DRMSQL003.</em></p>";
 }
 
-// Close the connection
 $conn = null;
 ?>
